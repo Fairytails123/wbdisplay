@@ -31,6 +31,16 @@
             --bd-grad: linear-gradient(135deg, #8b5cf6, #7c3aed);
             --bd-bg: #f5f3ff;
 
+            /* Grooming Dogs */
+            --gm-accent: #06b6d4;
+            --gm-grad: linear-gradient(135deg, #06b6d4, #0891b2);
+            --gm-bg: #ecfeff;
+
+            /* Boarding School */
+            --bs-accent: #f43f5e;
+            --bs-grad: linear-gradient(135deg, #f43f5e, #e11d48);
+            --bs-bg: #fff1f2;
+
             /* Van badges */
             --bv-bg: #dbeafe; --bv-text: #1d4ed8; --bv-bdr: #93c5fd;
             --sv-bg: #d1fae5; --sv-text: #065f46; --sv-bdr: #6ee7b7;
@@ -289,6 +299,8 @@
         .section-hdr.full-day { background: var(--fd-grad); }
         .section-hdr.half-day { background: var(--hd-grad); }
         .section-hdr.boarding { background: var(--bd-grad); }
+        .section-hdr.grooming { background: var(--gm-grad); }
+        .section-hdr.boarding-school { background: var(--bs-grad); }
 
         .section-hdr .s-label {
             display: flex;
@@ -338,6 +350,8 @@
         .dog-card.fd-card { border-left: 4px solid var(--fd-accent); background: var(--fd-bg); }
         .dog-card.hd-card { border-left: 4px solid var(--hd-accent); background: var(--hd-bg); }
         .dog-card.bd-card { border-left: 4px solid var(--bd-accent); background: var(--bd-bg); }
+        .dog-card.gm-card { border-left: 4px solid var(--gm-accent); background: var(--gm-bg); }
+        .dog-card.bs-card { border-left: 4px solid var(--bs-accent); background: var(--bs-bg); }
 
         .card-main {
             display: flex;
@@ -410,6 +424,58 @@
             padding: 0.06rem 0.2rem;
         }
 
+        /* Date badges (Check In / Check Out) */
+        .badge-date {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.15rem;
+            padding: 0.06rem 0.25rem;
+            border-radius: 0.2rem;
+            font-size: 0.5rem;
+            font-weight: 700;
+            white-space: nowrap;
+            line-height: 1.3;
+            border: 1px solid transparent;
+        }
+
+        .badge-date.checkin {
+            background: #f0fdf4;
+            color: #166534;
+            border-color: #86efac;
+        }
+
+        .badge-date.checkout {
+            background: #fef2f2;
+            color: #991b1b;
+            border-color: #fca5a5;
+        }
+
+        .badge-date .date-day {
+            font-weight: 900;
+            font-size: 0.48rem;
+            text-transform: uppercase;
+        }
+
+        /* Grooming pickup/dropoff badges */
+        .badge-pickup {
+            background: #ecfeff;
+            color: #0e7490;
+            border-color: #67e8f9;
+        }
+
+        .badge-dropoff {
+            background: #f0fdfa;
+            color: #115e59;
+            border-color: #5eead4;
+        }
+
+        /* Boarding School crate size badge */
+        .badge-bs-crate {
+            background: #fff1f2;
+            color: #9f1239;
+            border-color: #fda4af;
+        }
+
         /* Photo status */
         .photo-icon {
             font-size: 0.65rem;
@@ -444,6 +510,16 @@
             background: rgba(255,255,255,0.5);
             word-wrap: break-word;
             overflow-wrap: break-word;
+        }
+
+        /* Card dates (Check In / Check Out badges row) */
+        .card-dates {
+            display: flex;
+            align-items: center;
+            gap: 0.2rem;
+            padding: 0.1rem 0.35rem 0.12rem 0.55rem;
+            border-top: 1px dashed var(--border);
+            background: rgba(255,255,255,0.3);
         }
 
         .notes-icon {
@@ -652,6 +728,20 @@
                 </div>
                 <div class="cards-area" id="cards-bd"></div>
             </div>
+            <div class="board-section" id="section-gm">
+                <div class="section-hdr grooming">
+                    <span class="s-label">✂️ Grooming Dogs</span>
+                    <span class="s-count" id="count-gm">0 dogs</span>
+                </div>
+                <div class="cards-area" id="cards-gm"></div>
+            </div>
+            <div class="board-section" id="section-bs">
+                <div class="section-hdr boarding-school">
+                    <span class="s-label">🎓 Boarding School</span>
+                    <span class="s-count" id="count-bs">0 dogs</span>
+                </div>
+                <div class="cards-area" id="cards-bs"></div>
+            </div>
         </div>
     </main>
 
@@ -798,18 +888,26 @@
 
         // ---- Board Sections ----
         function renderAllSections(dogs) {
-            const groups = { 'Full Day': [], 'Half Day AM': [], 'Boarding': [] };
+            const groups = { 'Full Day': [], 'Half Day AM': [], 'Boarding': [], 'Grooming': [], 'Boarding School': [] };
 
             dogs.forEach(d => {
                 const t = (d.serviceType || 'Full Day');
-                if (t.includes('Half Day'))       groups['Half Day AM'].push(d);
-                else if (t.includes('Boarding'))   groups['Boarding'].push(d);
-                else                               groups['Full Day'].push(d);
+                if (t === 'Grooming')              groups['Grooming'].push(d);
+                else if (t === 'Boarding School')   groups['Boarding School'].push(d);
+                else if (t.includes('Half Day'))    groups['Half Day AM'].push(d);
+                else if (t.includes('Boarding'))    groups['Boarding'].push(d);
+                else                                groups['Full Day'].push(d);
             });
 
-            renderSection('fd', groups['Full Day'],    'fd');
-            renderSection('hd', groups['Half Day AM'], 'hd');
-            renderSection('bd', groups['Boarding'],    'bd');
+            renderSection('fd', groups['Full Day'],        'fd');
+            renderSection('hd', groups['Half Day AM'],     'hd');
+            renderSection('bd', groups['Boarding'],        'bd');
+            renderSection('gm', groups['Grooming'],        'gm');
+            renderSection('bs', groups['Boarding School'],  'bs');
+
+            // Hide empty Grooming / Boarding School sections to save TV space
+            document.getElementById('section-gm').style.display = groups['Grooming'].length ? '' : 'none';
+            document.getElementById('section-bs').style.display = groups['Boarding School'].length ? '' : 'none';
         }
 
         function renderSection(id, dogs, type) {
@@ -844,6 +942,10 @@
             let totalH = 0;
             dogs.forEach(d => {
                 let cardH = 38;
+                // Date row adds height (Boarding check-in/out or Boarding School dates)
+                if (d.checkIn || d.checkOut) {
+                    cardH += 20;
+                }
                 if (d.notes) {
                     const lines = Math.ceil(d.notes.length / 55) || 1;
                     cardH += 16 + (lines * 15);
@@ -861,6 +963,10 @@
             // Balanced distribution — estimate height for each dog and balance across columns
             const heights = dogs.map(d => {
                 let h = 38;
+                // Date row adds height (Boarding check-in/out or Boarding School dates)
+                if (d.checkIn || d.checkOut) {
+                    h += 20;
+                }
                 if (d.notes) {
                     const lines = Math.ceil(d.notes.length / 55) || 1;
                     h += 16 + (lines * 15);
@@ -879,9 +985,45 @@
             return cols.map(c => c.dogs);
         }
 
+        // ---- Helpers ----
+        function getDayName(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr + 'T00:00:00');
+            if (isNaN(date.getTime())) return '';
+            return date.toLocaleDateString('en-GB', { weekday: 'short' });
+        }
+
+        function formatDateShort(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr + 'T00:00:00');
+            if (isNaN(date.getTime())) return '';
+            return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        }
+
+        function dateBadgeHTML(dateStr, type) {
+            if (!dateStr) return '';
+            const day = getDayName(dateStr);
+            const formatted = formatDateShort(dateStr);
+            const cls = type === 'in' ? 'checkin' : 'checkout';
+            const icon = type === 'in' ? '📥' : '📤';
+            return `<span class="badge-date ${cls}">${icon} ${esc(formatted)} <span class="date-day">${esc(day)}</span></span>`;
+        }
+
         // ---- Card HTML ----
         function renderCard(dog, type) {
             const isBoarding = type === 'bd';
+            const isGrooming = type === 'gm';
+            const isBoardingSchool = type === 'bs';
+
+            // Grooming card — different layout
+            if (isGrooming) {
+                return renderGroomingCard(dog);
+            }
+
+            // Boarding School card — different layout
+            if (isBoardingSchool) {
+                return renderBoardingSchoolCard(dog);
+            }
 
             // AM badge
             const amBadge = vpBadgeHTML(dog.vpAM, dog.stopAM);
@@ -901,6 +1043,10 @@
             const notesHTML = dog.notes
                 ? `<div class="card-notes"><span class="notes-icon">📝</span>${esc(dog.notes)}</div>`
                 : '';
+
+            // Check In / Check Out dates (boarding only)
+            const checkInBadge = isBoarding ? dateBadgeHTML(dog.checkIn, 'in') : '';
+            const checkOutBadge = isBoarding ? dateBadgeHTML(dog.checkOut, 'out') : '';
 
             const cardClass = type === 'fd' ? 'fd-card' : type === 'hd' ? 'hd-card' : 'bd-card';
 
@@ -922,6 +1068,11 @@
                 }
             }
 
+            // Date badges row for boarding
+            const datesHTML = (checkInBadge || checkOutBadge)
+                ? `<div class="card-dates">${checkInBadge}${checkOutBadge}</div>`
+                : '';
+
             return `<div class="dog-card ${cardClass}">` +
                 '<div class="card-main">' +
                     `<span class="card-name">${esc(dog.name)}</span>` +
@@ -932,7 +1083,49 @@
                         walkHTML +
                     '</div>' +
                 '</div>' +
+                datesHTML +
                 notesHTML +
+            '</div>';
+        }
+
+        // ---- Grooming Card ----
+        function renderGroomingCard(dog) {
+            const pickupBadge = dog.pickup
+                ? `<span class="badge badge-pickup">${esc(dog.pickup)}</span>` : '';
+            const dropoffBadge = dog.dropoff
+                ? `<span class="badge badge-dropoff">${esc(dog.dropoff)}</span>` : '';
+            const vanBadge = dog.vanType
+                ? `<span class="badge ${vpClass(dog.vanType)}">${esc(dog.vanType)}</span>` : '';
+
+            return `<div class="dog-card gm-card">` +
+                '<div class="card-main">' +
+                    `<span class="card-name">${esc(dog.name)}</span>` +
+                    '<div class="card-badges">' +
+                        pickupBadge + dropoffBadge + vanBadge +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        }
+
+        // ---- Boarding School Card ----
+        function renderBoardingSchoolCard(dog) {
+            const checkInBadge = dateBadgeHTML(dog.checkIn, 'in');
+            const checkOutBadge = dateBadgeHTML(dog.checkOut, 'out');
+            const crateBadge = dog.crateSize
+                ? `<span class="badge badge-bs-crate">${esc(dog.crateSize)}</span>` : '';
+
+            const datesHTML = (checkInBadge || checkOutBadge)
+                ? `<div class="card-dates">${checkInBadge}${checkOutBadge}</div>`
+                : '';
+
+            return `<div class="dog-card bs-card">` +
+                '<div class="card-main">' +
+                    `<span class="card-name">${esc(dog.name)}</span>` +
+                    '<div class="card-badges">' +
+                        crateBadge +
+                    '</div>' +
+                '</div>' +
+                datesHTML +
             '</div>';
         }
 
