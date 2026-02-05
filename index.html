@@ -316,6 +316,74 @@
             font-weight: 800;
         }
 
+        /* ===== Boarding Parent Container (groups Boarding Hol + Boarding School) ===== */
+        .boarding-parent-section {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            flex: 1;
+        }
+
+        .section-hdr.boarding-parent {
+            background: var(--bd-grad);
+        }
+
+        .boarding-tv-subsections {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            border-left: 3px solid var(--bd-accent);
+            background: #faf9ff;
+        }
+
+        .boarding-tv-sub {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            flex: 1;
+        }
+
+        .boarding-tv-sub + .boarding-tv-sub {
+            border-top: 2px solid var(--border);
+        }
+
+        /* Sub-headers: smaller, themed */
+        .section-sub-hdr {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.2rem 0.5rem;
+            font-weight: 800;
+            font-size: 0.62rem;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .section-sub-hdr .s-label {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .section-sub-hdr .s-count {
+            background: rgba(255,255,255,0.3);
+            padding: 0.05rem 0.3rem;
+            border-radius: 1rem;
+            font-size: 0.5rem;
+            font-weight: 800;
+        }
+
+        /* Boarding Hol sub-header — lighter purple */
+        .section-sub-hdr.boarding-hol-sub {
+            background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+        }
+
+        /* Boarding School sub-header — rose */
+        .section-sub-hdr.boarding-school-sub {
+            background: linear-gradient(135deg, #fb7185 0%, #f43f5e 100%);
+        }
+
         .cards-area {
             flex: 1;
             overflow-y: auto;
@@ -721,12 +789,27 @@
                 </div>
                 <div class="cards-area" id="cards-hd"></div>
             </div>
-            <div class="board-section" id="section-bd">
-                <div class="section-hdr boarding">
+            <div class="board-section boarding-parent-section" id="section-boarding-parent">
+                <div class="section-hdr boarding-parent">
                     <span class="s-label">🏠 Boarding</span>
-                    <span class="s-count" id="count-bd">0 dogs</span>
+                    <span class="s-count" id="count-boarding-parent">0 dogs</span>
                 </div>
-                <div class="cards-area" id="cards-bd"></div>
+                <div class="boarding-tv-subsections">
+                    <div class="boarding-tv-sub" id="section-bd">
+                        <div class="section-sub-hdr boarding-hol-sub">
+                            <span class="s-label">🏖️ Boarding Hol</span>
+                            <span class="s-count" id="count-bd">0 dogs</span>
+                        </div>
+                        <div class="cards-area" id="cards-bd"></div>
+                    </div>
+                    <div class="boarding-tv-sub" id="section-bs">
+                        <div class="section-sub-hdr boarding-school-sub">
+                            <span class="s-label">🎓 Boarding School</span>
+                            <span class="s-count" id="count-bs">0 dogs</span>
+                        </div>
+                        <div class="cards-area" id="cards-bs"></div>
+                    </div>
+                </div>
             </div>
             <div class="board-section" id="section-gm">
                 <div class="section-hdr grooming">
@@ -734,13 +817,6 @@
                     <span class="s-count" id="count-gm">0 dogs</span>
                 </div>
                 <div class="cards-area" id="cards-gm"></div>
-            </div>
-            <div class="board-section" id="section-bs">
-                <div class="section-hdr boarding-school">
-                    <span class="s-label">🎓 Boarding School</span>
-                    <span class="s-count" id="count-bs">0 dogs</span>
-                </div>
-                <div class="cards-area" id="cards-bs"></div>
             </div>
         </div>
     </main>
@@ -902,12 +978,22 @@
             renderSection('fd', groups['Full Day'],        'fd');
             renderSection('hd', groups['Half Day AM'],     'hd');
             renderSection('bd', groups['Boarding'],        'bd');
-            renderSection('gm', groups['Grooming'],        'gm');
             renderSection('bs', groups['Boarding School'],  'bs');
+            renderSection('gm', groups['Grooming'],        'gm');
 
-            // Hide empty Grooming / Boarding School sections to save TV space
-            document.getElementById('section-gm').style.display = groups['Grooming'].length ? '' : 'none';
+            // Parent boarding container: combined count and visibility
+            const totalBoarding = groups['Boarding'].length + groups['Boarding School'].length;
+            const parentEl = document.getElementById('section-boarding-parent');
+            const parentCountEl = document.getElementById('count-boarding-parent');
+            parentCountEl.textContent = totalBoarding === 1 ? '1 dog' : totalBoarding + ' dogs';
+            parentEl.style.display = totalBoarding > 0 ? '' : 'none';
+
+            // Hide empty sub-sections within parent
+            document.getElementById('section-bd').style.display = groups['Boarding'].length ? '' : 'none';
             document.getElementById('section-bs').style.display = groups['Boarding School'].length ? '' : 'none';
+
+            // Hide empty Grooming section to save TV space
+            document.getElementById('section-gm').style.display = groups['Grooming'].length ? '' : 'none';
         }
 
         function renderSection(id, dogs, type) {
