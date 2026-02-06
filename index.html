@@ -328,6 +328,22 @@
             background: var(--bd-grad);
         }
 
+        .boarding-hdr-stats {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-shrink: 0;
+        }
+
+        .crate-summary {
+            background: rgba(255,255,255,0.2);
+            padding: 0.06rem 0.35rem;
+            border-radius: 1rem;
+            font-size: 0.52rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
         .boarding-tv-subsections {
             flex: 1;
             display: flex;
@@ -792,7 +808,10 @@
             <div class="board-section boarding-parent-section" id="section-boarding-parent">
                 <div class="section-hdr boarding-parent">
                     <span class="s-label">🏠 Boarding</span>
-                    <span class="s-count" id="count-boarding-parent">0 dogs</span>
+                    <div class="boarding-hdr-stats">
+                        <span class="crate-summary" id="tv-crate-summary"></span>
+                        <span class="s-count" id="count-boarding-parent">0 dogs</span>
+                    </div>
                 </div>
                 <div class="boarding-tv-subsections">
                     <div class="boarding-tv-sub" id="section-bd">
@@ -981,12 +1000,23 @@
             renderSection('bs', groups['Boarding School'],  'bs');
             renderSection('gm', groups['Grooming'],        'gm');
 
-            // Parent boarding container: combined count and visibility
+            // Parent boarding container: combined count, crate summary, visibility
             const totalBoarding = groups['Boarding'].length + groups['Boarding School'].length;
             const parentEl = document.getElementById('section-boarding-parent');
             const parentCountEl = document.getElementById('count-boarding-parent');
             parentCountEl.textContent = totalBoarding === 1 ? '1 dog' : totalBoarding + ' dogs';
             parentEl.style.display = totalBoarding > 0 ? '' : 'none';
+
+            // Crate counts across both sub-sections (Boarding uses 'crate', Boarding School uses 'crateSize')
+            const crateLabels = { 'HLL': 'Large', 'HLM': 'Medium', 'HLS': 'Small', 'HSB': 'House Bottom', 'HST': 'House Small' };
+            const crateCounts = {};
+            groups['Boarding'].forEach(d => { if (d.crate && crateLabels[d.crate]) crateCounts[d.crate] = (crateCounts[d.crate] || 0) + 1; });
+            groups['Boarding School'].forEach(d => { if (d.crateSize && crateLabels[d.crateSize]) crateCounts[d.crateSize] = (crateCounts[d.crateSize] || 0) + 1; });
+            const crateSummary = ['HLL', 'HLM', 'HLS', 'HSB', 'HST']
+                .filter(code => crateCounts[code])
+                .map(code => crateLabels[code] + ' ' + crateCounts[code])
+                .join(', ');
+            document.getElementById('tv-crate-summary').textContent = crateSummary;
 
             // Hide empty sub-sections within parent
             document.getElementById('section-bd').style.display = groups['Boarding'].length ? '' : 'none';
