@@ -437,6 +437,14 @@
         .dog-card.gm-card { border-left: 4px solid var(--gm-accent); background: var(--gm-bg); }
         .dog-card.bs-card { border-left: 4px solid var(--bs-accent); background: var(--bs-bg); }
 
+        /* ADDED: Van-group background tints — higher specificity overrides section bg */
+        /* Tint colours match the existing badge colour scheme for visual consistency */
+        .dog-card.vg-none { /* No override — keeps default section background */ }
+        .dog-card.vg-p    { background: #f3e8ff; } /* Purple tint — matches P badge palette */
+        .dog-card.vg-bv   { background: #dbeafe; } /* Blue tint — matches BV badge palette */
+        .dog-card.vg-sv   { background: #d1fae5; } /* Green tint — matches SV badge palette */
+        .dog-card.vg-dv   { background: #fef3c7; } /* Amber tint — matches DV badge palette */
+
         .card-main {
             display: flex;
             align-items: center;
@@ -994,6 +1002,16 @@
                 else                                groups['Full Day'].push(d);
             });
 
+            // ADDED: Sort each group alphabetically by dog name (case-insensitive)
+            const nameSort = (a, b) => (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' });
+            Object.values(groups).forEach(group => group.sort(nameSort));
+
+            // ADDED: Stable secondary sort by PM van group — preserves alphabetical within each group
+            // Order: no assignment (top) → P → BV/V → SV → DV
+            Object.values(groups).forEach(group => group.sort((a, b) => {
+                return getVanGroupIndex(a) - getVanGroupIndex(b);
+            }));
+
             renderSection('fd', groups['Full Day'],        'fd');
             renderSection('hd', groups['Half Day AM'],     'hd');
             renderSection('bd', groups['Boarding'],        'bd');
@@ -1024,6 +1042,76 @@
 
             // Hide empty Grooming section to save TV space
             document.getElementById('section-gm').style.display = groups['Grooming'].length ? '' : 'none';
+
+            // ADDED: Dynamically size right-column sections proportional to content
+            adjustRightColumnLayout(
+                groups['Half Day AM'].length,
+                groups['Boarding'].length,
+                groups['Boarding School'].length,
+                groups['Grooming'].length
+            );
+        }
+
+        // ================================================================
+        //  DYNAMIC RIGHT-COLUMN LAYOUT — proportional flex from dog counts
+        //  Calculates a weight for each section based on number of dogs
+        //  plus header overhead, then assigns flex values so sections with
+        //  more dogs get proportionally more vertical space.
+        //  Uses style.flex (full shorthand) to reliably override CSS flex:1.
+        // ================================================================
+        function adjustRightColumnLayout(hdCount, bdCount, bsCount, gmCount) {
+            // Header overhead relative to one dog-card height:
+            // Main section header ≈ 0.8 card-heights, sub-header ≈ 0.6
+            const HDR_WEIGHT = 0.8;
+            const SUB_HDR_WEIGHT = 0.6;
+
+            // --- Step 1: Boarding sub-sections (Boarding Hol vs Boarding School) ---
+            const bdSub = document.getElementById('section-bd');
+            const bsSub = document.getElementById('section-bs');
+
+            if (bdSub && bsSub) {
+                const bdVisible = bdSub.style.display !== 'none';
+                const bsVisible = bsSub.style.display !== 'none';
+
+                if (bdVisible && bsVisible) {
+                    // Weight = dog count + sub-header overhead
+                    const bdWeight = bdCount + SUB_HDR_WEIGHT;
+                    const bsWeight = bsCount + SUB_HDR_WEIGHT;
+                    // Use style.flex shorthand to reliably override CSS flex: 1
+                    bdSub.style.flex = `${bdWeight} 1 0px`;
+                    bsSub.style.flex = `${bsWeight} 1 0px`;
+                } else if (bdVisible) {
+                    bdSub.style.flex = '1 1 0px';
+                } else if (bsVisible) {
+                    bsSub.style.flex = '1 1 0px';
+                }
+            }
+
+            // --- Step 2: Main right-column sections (Half Day, Boarding Parent, Grooming) ---
+            const hdSection = document.getElementById('section-hd');
+            const boardingParent = document.getElementById('section-boarding-parent');
+            const gmSection = document.getElementById('section-gm');
+
+            const totalBoardingDogs = bdCount + bsCount;
+
+            // Calculate weights: dog count + header overhead
+            // Boarding parent has: 1 parent header + sub-headers for each visible sub-section
+            const hdVisible = hdSection && hdSection.style.display !== 'none';
+            const bpVisible = boardingParent && boardingParent.style.display !== 'none';
+            const gmVisible = gmSection && gmSection.style.display !== 'none';
+
+            // Count how many boarding sub-headers are visible
+            const visibleSubHeaders = (bdCount > 0 ? 1 : 0) + (bsCount > 0 ? 1 : 0);
+            const boardingOverhead = HDR_WEIGHT + (visibleSubHeaders * SUB_HDR_WEIGHT);
+
+            const hdWeight = hdCount + HDR_WEIGHT;
+            const bpWeight = totalBoardingDogs + boardingOverhead;
+            const gmWeight = gmCount + HDR_WEIGHT;
+
+            // Apply flex proportions (minimum weight of 1 to prevent total collapse)
+            if (hdVisible) hdSection.style.flex = `${Math.max(1, hdWeight)} 1 0px`;
+            if (bpVisible) boardingParent.style.flex = `${Math.max(1, bpWeight)} 1 0px`;
+            if (gmVisible) gmSection.style.flex = `${Math.max(1, gmWeight)} 1 0px`;
         }
 
         function renderSection(id, dogs, type) {
@@ -1090,12 +1178,22 @@
                 return h;
             });
 
-            // Greedy assignment: put each dog in the shortest column
+            // MODIFIED: Sequential column-fill so grouped + alphabetical order reads top-to-bottom
+            // Calculate target height per column, then fill each column until it reaches
+            // the target before moving to the next. Last column gets whatever remains.
+            const totalH = heights.reduce((sum, h) => sum + h, 0);
+            const targetH = totalH / n;
+
             const cols = Array.from({ length: n }, () => ({ dogs: [], height: 0 }));
+            let colIdx = 0;
+
             dogs.forEach((dog, i) => {
-                const shortest = cols.reduce((min, c) => c.height < min.height ? c : min, cols[0]);
-                shortest.dogs.push(dog);
-                shortest.height += heights[i];
+                // Move to next column if current has reached target (but never past last column)
+                if (colIdx < n - 1 && cols[colIdx].height >= targetH) {
+                    colIdx++;
+                }
+                cols[colIdx].dogs.push(dog);
+                cols[colIdx].height += heights[i];
             });
 
             return cols.map(c => c.dogs);
@@ -1189,7 +1287,7 @@
                 ? `<div class="card-dates">${checkInBadge}${checkOutBadge}</div>`
                 : '';
 
-            return `<div class="dog-card ${cardClass}">` +
+            return `<div class="dog-card ${cardClass} ${getVanGroupClass(dog)}">` +
                 '<div class="card-main">' +
                     `<span class="card-name">${esc(dog.name)}</span>` +
                     '<div class="card-badges">' +
@@ -1213,7 +1311,7 @@
             const vanBadge = dog.vanType
                 ? `<span class="badge ${vpClass(dog.vanType)}">${esc(dog.vanType)}</span>` : '';
 
-            return `<div class="dog-card gm-card">` +
+            return `<div class="dog-card gm-card ${getVanGroupClass(dog)}">` +
                 '<div class="card-main">' +
                     `<span class="card-name">${esc(dog.name)}</span>` +
                     '<div class="card-badges">' +
@@ -1234,7 +1332,7 @@
                 ? `<div class="card-dates">${checkInBadge}${checkOutBadge}</div>`
                 : '';
 
-            return `<div class="dog-card bs-card">` +
+            return `<div class="dog-card bs-card ${getVanGroupClass(dog)}">` +
                 '<div class="card-main">' +
                     `<span class="card-name">${esc(dog.name)}</span>` +
                     '<div class="card-badges">' +
@@ -1258,6 +1356,29 @@
             if (vp === 'DV') return 'badge-dv';
             if (vp === 'P')  return 'badge-p';
             return '';
+        }
+
+        // ADDED: Van group index — determines sort order by PM assignment
+        // Returns: 0 = no assignment, 1 = P, 2 = V/BV, 3 = SV, 4 = DV
+        function getVanGroupIndex(dog) {
+            const pm = (dog.vpPM || '').toUpperCase();
+            if (!pm) return 0;
+            if (pm === 'P')              return 1;
+            if (pm === 'V' || pm === 'BV') return 2;
+            if (pm === 'SV')             return 3;
+            if (pm === 'DV')             return 4;
+            return 0; // Unknown — treat as no assignment
+        }
+
+        // ADDED: Van group CSS tint class based on PM assignment
+        function getVanGroupClass(dog) {
+            const pm = (dog.vpPM || '').toUpperCase();
+            if (!pm) return 'vg-none';
+            if (pm === 'P')              return 'vg-p';
+            if (pm === 'V' || pm === 'BV') return 'vg-bv';
+            if (pm === 'SV')             return 'vg-sv';
+            if (pm === 'DV')             return 'vg-dv';
+            return 'vg-none';
         }
 
         function walkBadgeHTML(walk) {
