@@ -1200,16 +1200,33 @@
         }
 
         // ---- Helpers ----
+        // ADDED: Normalise date string to YYYY-MM-DD, handling ISO timestamps
+        // e.g. "2026-02-18T00:00:00.000Z" → "2026-02-18"
+        //       "2026-02-18" → "2026-02-18" (unchanged)
+        function normaliseDateStr(dateStr) {
+            if (!dateStr) return '';
+            const s = String(dateStr).trim();
+            // If it contains 'T', take only the date portion before it
+            const tIdx = s.indexOf('T');
+            if (tIdx > -1) return s.substring(0, tIdx);
+            // If it's already YYYY-MM-DD, return as-is
+            return s;
+        }
+
         function getDayName(dateStr) {
             if (!dateStr) return '';
-            const date = new Date(dateStr + 'T00:00:00');
+            const normalised = normaliseDateStr(dateStr);
+            if (!normalised) return '';
+            const date = new Date(normalised + 'T00:00:00');
             if (isNaN(date.getTime())) return '';
             return date.toLocaleDateString('en-GB', { weekday: 'short' });
         }
 
         function formatDateShort(dateStr) {
             if (!dateStr) return '';
-            const date = new Date(dateStr + 'T00:00:00');
+            const normalised = normaliseDateStr(dateStr);
+            if (!normalised) return '';
+            const date = new Date(normalised + 'T00:00:00');
             if (isNaN(date.getTime())) return '';
             return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
         }
