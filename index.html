@@ -982,11 +982,23 @@
         }
 
         // ---- Van Times ----
+        // ADDED: Normalise van time values — handles Date objects and raw strings
+        function normaliseVanTime(val) {
+            if (!val) return '—';
+            const str = String(val).trim();
+            // Already HH:MM format
+            if (/^\d{2}:\d{2}$/.test(str)) return str;
+            // Try to extract HH:MM from longer strings (e.g. "Sat Dec 30 1899 07:30:00 GMT...")
+            const timeMatch = str.match(/(\d{2}:\d{2}):\d{2}/);
+            if (timeMatch) return timeMatch[1];
+            return str || '—';
+        }
+
         function renderVanTimes(vt) {
             if (!vt) return;
-            document.getElementById('vtBV').textContent = vt.BV || '—';
-            document.getElementById('vtDV').textContent = vt.DV || '—';
-            document.getElementById('vtSV').textContent = vt.SV || '—';
+            document.getElementById('vtBV').textContent = normaliseVanTime(vt.BV);
+            document.getElementById('vtDV').textContent = normaliseVanTime(vt.DV);
+            document.getElementById('vtSV').textContent = normaliseVanTime(vt.SV);
         }
 
         // ---- Board Sections ----
@@ -1200,21 +1212,17 @@
         }
 
         // ---- Helpers ----
-        // ADDED: Normalise date string to YYYY-MM-DD, handling ISO timestamps
-        // e.g. "2026-02-18T00:00:00.000Z" → "2026-02-18"
-        //       "2026-02-18" → "2026-02-18" (unchanged)
+        // ADDED: Normalise date strings — strips ISO timestamps and validates YYYY-MM-DD
         function normaliseDateStr(dateStr) {
             if (!dateStr) return '';
-            const s = String(dateStr).trim();
-            // If it contains 'T', take only the date portion before it
-            const tIdx = s.indexOf('T');
-            if (tIdx > -1) return s.substring(0, tIdx);
-            // If it's already YYYY-MM-DD, return as-is
-            return s;
+            let str = String(dateStr).trim();
+            // Strip ISO timestamp suffix (e.g. "2026-02-18T00:00:00.000Z" → "2026-02-18")
+            if (str.includes('T')) str = str.split('T')[0];
+            // Validate YYYY-MM-DD format
+            return /^\d{4}-\d{2}-\d{2}$/.test(str) ? str : '';
         }
 
         function getDayName(dateStr) {
-            if (!dateStr) return '';
             const normalised = normaliseDateStr(dateStr);
             if (!normalised) return '';
             const date = new Date(normalised + 'T00:00:00');
@@ -1223,7 +1231,6 @@
         }
 
         function formatDateShort(dateStr) {
-            if (!dateStr) return '';
             const normalised = normaliseDateStr(dateStr);
             if (!normalised) return '';
             const date = new Date(normalised + 'T00:00:00');
