@@ -768,6 +768,29 @@
 
         .data-flash { animation: flash-card 0.8s ease-out; }
 
+        /* ======================== BOARDING PLANNER IFRAME TAB ======================== */
+        /* Isolated container for the embedded Boarding Planner — loaded via iframe
+           so that CSS/JS from the planner never conflicts with the whiteboard.
+           Update the Boarding Planner independently by changing the hosted file. */
+        .boarding-planner-frame {
+            flex: 1;
+            display: none;          /* Hidden by default — shown when tab is active */
+            min-height: 0;
+            border: none;
+            background: var(--bg);
+        }
+
+        .boarding-planner-frame.active {
+            display: flex;
+        }
+
+        .boarding-planner-frame iframe {
+            flex: 1;
+            width: 100%;
+            border: none;
+            background: var(--bg);
+        }
+
         /* ======================== RESPONSIVE (safety for non-4K) ======================== */
         @media (max-height: 600px) {
             :root { font-size: 14px; }
@@ -828,6 +851,7 @@
     <nav class="tv-tabs">
         <button class="tab-btn active" data-tab="today" tabindex="1" onclick="switchTab('today')">📅 TODAY</button>
         <button class="tab-btn" data-tab="tomorrow" tabindex="2" onclick="switchTab('tomorrow')">📆 TOMORROW</button>
+        <button class="tab-btn" data-tab="boarding-plan" tabindex="3" onclick="switchTab('boarding-plan')">📋 BOARDING PLAN</button>
         <span class="tab-hint">◀ ▶ Use remote arrows to switch</span>
     </nav>
 
@@ -893,6 +917,16 @@
         </div>
     </main>
 
+    <!-- ============ BOARDING PLANNER (iframe tab) ============ -->
+    <!-- ADDED: Isolated iframe container for the Boarding Planner.
+         The iframe loads the Boarding Planner from CONFIG.BOARDING_PLANNER_URL.
+         To update the Boarding Planner, simply update the hosted file — no
+         changes needed here. The iframe is only loaded once (on first tab visit)
+         to avoid unnecessary network requests. -->
+    <div class="boarding-planner-frame" id="boardingPlannerContainer">
+        <!-- iframe injected on first tab activation by switchTab() -->
+    </div>
+
     <!-- ============ STATUS BAR ============ -->
     <footer class="status-bar">
         <div class="status-left">
@@ -921,6 +955,10 @@
             // Same Google Apps Script URL as the edit board
             SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzqXD9OCM5oSNFdy3OF7pOG0PRcpy4dgkEYWJBVh40CFHJgjvSpPn6SE-mNjloo-GKw/exec',
 
+            // ADDED: URL for the Boarding Planner page (loaded in iframe tab)
+            // Change this to the hosted URL of your Boarding Planner (index.html)
+            BOARDING_PLANNER_URL: 'https://fairytails123.github.io/Boardingplan/',
+
             // 97 seconds — offset from edit board's 93s inbound & 94s outbound
             REFRESH_INTERVAL: 97000,
 
@@ -943,6 +981,12 @@
             CONFIG.REFRESH_INTERVAL = customRefresh * 1000;
         }
 
+        // ADDED: Allow URL parameter override for Boarding Planner URL: ?boardingUrl=https://...
+        const customBoardingUrl = urlParams.get('boardingUrl');
+        if (customBoardingUrl) {
+            CONFIG.BOARDING_PLANNER_URL = customBoardingUrl;
+        }
+
         // ================================================================
         //  STATE
         // ================================================================
@@ -952,7 +996,8 @@
             lastUpdate: null,
             loading: true,
             error: false,
-            firstLoad: true
+            firstLoad: true,
+            boardingPlannerLoaded: false  // ADDED: Tracks whether the iframe has been injected
         };
 
         // ================================================================
@@ -1485,16 +1530,50 @@
             document.querySelectorAll('.tab-btn').forEach(b =>
                 b.classList.toggle('active', b.dataset.tab === tab)
             );
-            render();
+
+            // ADDED: Toggle visibility between main board and Boarding Planner iframe
+            const mainBoard = document.getElementById('tvBoard');
+            const bpContainer = document.getElementById('boardingPlannerContainer');
+
+            if (tab === 'boarding-plan') {
+                // Hide main board, show Boarding Planner
+                mainBoard.style.display = 'none';
+                bpContainer.classList.add('active');
+
+                // Lazy-load the iframe on first activation
+                if (!state.boardingPlannerLoaded) {
+                    const iframe = document.createElement('iframe');
+                    iframe.src = CONFIG.BOARDING_PLANNER_URL;
+                    iframe.title = 'Boarding Planner';
+                    iframe.setAttribute('loading', 'lazy');
+                    bpContainer.appendChild(iframe);
+                    state.boardingPlannerLoaded = true;
+                }
+            } else {
+                // Show main board, hide Boarding Planner
+                mainBoard.style.display = '';
+                bpContainer.classList.remove('active');
+                render();
+            }
         }
 
         // ================================================================
         //  KEYBOARD / TV REMOTE NAVIGATION
         // ================================================================
+        // MODIFIED: Cycles through all tabs (today → tomorrow → boarding-plan → today…)
+        // Preserves original ArrowLeft/ArrowRight behaviour, extended for 3 tabs
+        const TAB_ORDER = ['today', 'tomorrow', 'boarding-plan'];
         document.addEventListener('keydown', e => {
             if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
                 e.preventDefault();
-                switchTab(state.tab === 'today' ? 'tomorrow' : 'today');
+                const currentIdx = TAB_ORDER.indexOf(state.tab);
+                let nextIdx;
+                if (e.key === 'ArrowRight') {
+                    nextIdx = (currentIdx + 1) % TAB_ORDER.length;
+                } else {
+                    nextIdx = (currentIdx - 1 + TAB_ORDER.length) % TAB_ORDER.length;
+                }
+                switchTab(TAB_ORDER[nextIdx]);
             }
         });
 
