@@ -64,6 +64,12 @@
 
             /* Responsive root — scales with viewport height for TV distance reading */
             font-size: clamp(16px, 2.05vh, 28px);
+
+            /* ADDED: Dynamic content scale — adjusted by JS after each render
+               based on total content height vs available viewport.
+               1.0 = default size; shrinks when content overflows, grows when space is spare.
+               Clamped between 0.55 (minimum readability) and 1.25 (max growth). */
+            --content-scale: 1;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -289,9 +295,10 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0.3rem 0.6rem;
+            padding: calc(0.3rem * var(--content-scale)) calc(0.6rem * var(--content-scale));
             font-weight: 800;
-            font-size: 0.75rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.75rem * var(--content-scale));
             color: white;
             flex-shrink: 0;
         }
@@ -310,9 +317,10 @@
 
         .section-hdr .s-count {
             background: rgba(255,255,255,0.25);
-            padding: 0.08rem 0.4rem;
+            padding: calc(0.08rem * var(--content-scale)) calc(0.4rem * var(--content-scale));
             border-radius: 1rem;
-            font-size: 0.6rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.6rem * var(--content-scale));
             font-weight: 800;
         }
 
@@ -337,9 +345,10 @@
 
         .crate-summary {
             background: rgba(255,255,255,0.2);
-            padding: 0.06rem 0.35rem;
+            padding: calc(0.06rem * var(--content-scale)) calc(0.35rem * var(--content-scale));
             border-radius: 1rem;
-            font-size: 0.52rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.52rem * var(--content-scale));
             font-weight: 700;
             white-space: nowrap;
         }
@@ -369,9 +378,10 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0.2rem 0.5rem;
+            padding: calc(0.2rem * var(--content-scale)) calc(0.5rem * var(--content-scale));
             font-weight: 800;
-            font-size: 0.62rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.62rem * var(--content-scale));
             color: white;
             flex-shrink: 0;
         }
@@ -384,9 +394,10 @@
 
         .section-sub-hdr .s-count {
             background: rgba(255,255,255,0.3);
-            padding: 0.05rem 0.3rem;
+            padding: calc(0.05rem * var(--content-scale)) calc(0.3rem * var(--content-scale));
             border-radius: 1rem;
-            font-size: 0.5rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.5rem * var(--content-scale));
             font-weight: 800;
         }
 
@@ -403,9 +414,10 @@
         .cards-area {
             flex: 1;
             overflow-y: auto;
-            padding: 0.3rem;
+            /* MODIFIED: Padding and gap scale with content volume */
+            padding: calc(0.3rem * var(--content-scale));
             display: flex;
-            gap: 0.3rem;
+            gap: calc(0.3rem * var(--content-scale));
             min-height: 0;
         }
 
@@ -418,7 +430,8 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 0.2rem;
+            /* MODIFIED: Gap scales with content volume */
+            gap: calc(0.2rem * var(--content-scale));
             min-width: 0;
         }
 
@@ -448,18 +461,24 @@
         .card-main {
             display: flex;
             align-items: center;
-            padding: 0.2rem 0.35rem;
-            gap: 0.3rem;
-            min-height: 1.8rem;
+            /* MODIFIED: Padding scales with content volume */
+            padding: calc(0.2rem * var(--content-scale)) calc(0.35rem * var(--content-scale));
+            gap: calc(0.3rem * var(--content-scale));
+            min-height: calc(1.8rem * var(--content-scale));
         }
 
         .card-name {
             font-weight: 800;
-            font-size: 0.82rem;
+            /* MODIFIED: Font size now scales dynamically via --content-scale */
+            font-size: calc(0.82rem * var(--content-scale));
             color: var(--text);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            /* MODIFIED: Allow wrapping for long names instead of clipping.
+               Original was: white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+               Preserved as comment for reference. */
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.2;
             flex: 1;
             min-width: 0;
         }
@@ -481,7 +500,8 @@
         }
 
         .bg-label {
-            font-size: 0.38rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.38rem * var(--content-scale));
             font-weight: 800;
             color: var(--text-muted);
             text-transform: uppercase;
@@ -494,9 +514,10 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 0.08rem 0.28rem;
+            padding: calc(0.08rem * var(--content-scale)) calc(0.28rem * var(--content-scale));
             border-radius: 0.2rem;
-            font-size: 0.58rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.58rem * var(--content-scale));
             font-weight: 800;
             white-space: nowrap;
             line-height: 1.3;
@@ -512,18 +533,20 @@
         .badge-empty {
             background: #f1f5f9;
             color: #94a3b8;
-            font-size: 0.5rem;
-            padding: 0.06rem 0.2rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.5rem * var(--content-scale));
+            padding: calc(0.06rem * var(--content-scale)) calc(0.2rem * var(--content-scale));
         }
 
         /* Date badges (Check In / Check Out) */
         .badge-date {
             display: inline-flex;
             align-items: center;
-            gap: 0.15rem;
-            padding: 0.06rem 0.25rem;
+            gap: calc(0.15rem * var(--content-scale));
+            padding: calc(0.06rem * var(--content-scale)) calc(0.25rem * var(--content-scale));
             border-radius: 0.2rem;
-            font-size: 0.5rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.5rem * var(--content-scale));
             font-weight: 700;
             white-space: nowrap;
             line-height: 1.3;
@@ -544,7 +567,8 @@
 
         .badge-date .date-day {
             font-weight: 900;
-            font-size: 0.48rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.48rem * var(--content-scale));
             text-transform: uppercase;
         }
 
@@ -570,7 +594,8 @@
 
         /* Photo status */
         .photo-icon {
-            font-size: 0.65rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.65rem * var(--content-scale));
             line-height: 1;
             flex-shrink: 0;
         }
@@ -582,9 +607,10 @@
         .walk-badge {
             display: inline-flex;
             align-items: center;
-            padding: 0.06rem 0.22rem;
+            padding: calc(0.06rem * var(--content-scale)) calc(0.22rem * var(--content-scale));
             border-radius: 0.18rem;
-            font-size: 0.55rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.55rem * var(--content-scale));
             font-weight: 800;
             white-space: nowrap;
         }
@@ -594,8 +620,9 @@
 
         /* Card notes */
         .card-notes {
-            padding: 0.12rem 0.35rem 0.22rem 0.55rem;
-            font-size: 0.58rem;
+            padding: calc(0.12rem * var(--content-scale)) calc(0.35rem * var(--content-scale)) calc(0.22rem * var(--content-scale)) calc(0.55rem * var(--content-scale));
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.58rem * var(--content-scale));
             color: #475569;
             line-height: 1.35;
             border-top: 1px dashed var(--border);
@@ -608,21 +635,27 @@
         .card-dates {
             display: flex;
             align-items: stretch;
-            gap: 0.3rem;
-            padding: 0.15rem 0.35rem 0.2rem 0.55rem;
+            gap: calc(0.3rem * var(--content-scale));
+            padding: calc(0.15rem * var(--content-scale)) calc(0.35rem * var(--content-scale)) calc(0.2rem * var(--content-scale)) calc(0.55rem * var(--content-scale));
             border-top: 1px dashed var(--border);
             background: rgba(255,255,255,0.3);
+            /* ADDED: Allow date badges to wrap to a second line if card is too narrow */
+            flex-wrap: wrap;
         }
 
         .date-container {
             display: flex;
             align-items: center;
-            gap: 0.2rem;
-            padding: 0.12rem 0.35rem;
+            gap: calc(0.2rem * var(--content-scale));
+            padding: calc(0.12rem * var(--content-scale)) calc(0.35rem * var(--content-scale));
             border-radius: 0.25rem;
-            font-size: 0.55rem;
+            /* MODIFIED: Font scales with content volume */
+            font-size: calc(0.55rem * var(--content-scale));
             font-weight: 700;
-            white-space: nowrap;
+            /* MODIFIED: Allow wrapping for long date strings instead of clipping.
+               Original was: white-space: nowrap; — preserved as comment. */
+            white-space: normal;
+            word-break: keep-all;
             flex: 1;
             min-width: 0;
         }
@@ -640,7 +673,8 @@
         }
 
         .date-label {
-            font-size: 0.42rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.42rem * var(--content-scale));
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.03em;
@@ -649,19 +683,22 @@
         }
 
         .date-value {
-            font-size: 0.55rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.55rem * var(--content-scale));
             font-weight: 700;
         }
 
         .date-day {
             font-weight: 900;
-            font-size: 0.48rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.48rem * var(--content-scale));
             text-transform: uppercase;
         }
 
         .notes-icon {
-            font-size: 0.5rem;
-            margin-right: 0.15rem;
+            /* MODIFIED: Scales with content volume */
+            font-size: calc(0.5rem * var(--content-scale));
+            margin-right: calc(0.15rem * var(--content-scale));
         }
 
         /* ======================== EMPTY STATE ======================== */
@@ -1045,6 +1082,65 @@
         // ================================================================
         //  RENDERING
         // ================================================================
+        // ================================================================
+        //  DYNAMIC CONTENT SCALING — auto-fits cards/fonts to viewport
+        //  Measures the natural (unscaled) content height of both columns
+        //  against the available board height, then sets --content-scale
+        //  so everything fits without overflow or wasted space.
+        //  MIN_SCALE prevents text from becoming unreadable at distance.
+        //  MAX_SCALE prevents text from becoming comically large when few dogs.
+        // ================================================================
+        const SCALE_LIMITS = { MIN: 0.55, MAX: 1.25 };
+        let lastScale = 1;
+
+        function dynamicScale() {
+            const board = document.getElementById('tvBoard');
+            if (!board || board.style.display === 'none') return;
+
+            // Temporarily reset scale to 1 to measure natural content height
+            document.documentElement.style.setProperty('--content-scale', '1');
+
+            // Force layout recalculation
+            void board.offsetHeight;
+
+            const boardRect = board.getBoundingClientRect();
+            const availableH = boardRect.height;
+
+            if (availableH <= 0) return;
+
+            // Measure left column (Full Day) scrollHeight
+            const leftCol = document.querySelector('.board-left');
+            const leftScrollH = leftCol ? leftCol.scrollHeight : 0;
+
+            // Measure right column sections total scrollHeight
+            const rightCol = document.querySelector('.board-right');
+            const rightScrollH = rightCol ? rightCol.scrollHeight : 0;
+
+            // The tallest column determines whether we need to shrink
+            const maxContentH = Math.max(leftScrollH, rightScrollH);
+
+            if (maxContentH <= 0) return;
+
+            // Calculate ideal scale factor
+            let scale = availableH / maxContentH;
+
+            // Clamp within readable limits
+            scale = Math.max(SCALE_LIMITS.MIN, Math.min(SCALE_LIMITS.MAX, scale));
+
+            // Round to 2 decimal places to avoid sub-pixel jitter
+            scale = Math.round(scale * 100) / 100;
+
+            // Only update DOM if scale actually changed (avoids layout thrash)
+            if (scale !== lastScale) {
+                document.documentElement.style.setProperty('--content-scale', scale.toString());
+                lastScale = scale;
+            } else {
+                // Restore the scale we just reset
+                document.documentElement.style.setProperty('--content-scale', lastScale.toString());
+            }
+        }
+
+        // ---- Render ----
         function render() {
             const tabData = state.data?.[state.tab];
             if (!tabData) return;
@@ -1053,6 +1149,12 @@
             renderVanTimes(tabData.vanTimes);
             renderAllSections(tabData.dogs || []);
             renderStatusBar();
+
+            // ADDED: Recalculate dynamic content scaling after all sections are rendered.
+            // Uses requestAnimationFrame to ensure the DOM has fully laid out before measuring.
+            requestAnimationFrame(() => {
+                dynamicScale();
+            });
         }
 
         // ---- Stats ----
@@ -1244,17 +1346,24 @@
             // Estimate available height (use offsetHeight or fallback)
             const h = container.offsetHeight || 500;
 
-            // Approximate per-card height: base ~38px, notes add ~22px per notes line (~60 chars)
+            // MODIFIED: Scale-aware per-card height estimation
+            // Base card height accounts for name potentially wrapping on longer names
+            const scale = lastScale || 1;
             let totalH = 0;
             dogs.forEach(d => {
-                let cardH = 38;
+                // Base card height — scales with content scale factor
+                let cardH = 38 * scale;
+                // Long names (>20 chars) likely wrap to 2 lines — add extra height
+                if (d.name && d.name.length > 20) {
+                    cardH += 14 * scale;
+                }
                 // Date row adds height (Boarding check-in/out or Boarding School dates)
                 if (d.checkIn || d.checkOut) {
-                    cardH += 20;
+                    cardH += 22 * scale;
                 }
                 if (d.notes) {
                     const lines = Math.ceil(d.notes.length / 55) || 1;
-                    cardH += 16 + (lines * 15);
+                    cardH += (16 + (lines * 15)) * scale;
                 }
                 totalH += cardH;
             });
@@ -1267,15 +1376,21 @@
             if (n <= 1) return [dogs];
 
             // Balanced distribution — estimate height for each dog and balance across columns
+            // MODIFIED: Scale-aware height estimation with wrapping name support
+            const scale = lastScale || 1;
             const heights = dogs.map(d => {
-                let h = 38;
+                let h = 38 * scale;
+                // Long names likely wrap — add extra height
+                if (d.name && d.name.length > 20) {
+                    h += 14 * scale;
+                }
                 // Date row adds height (Boarding check-in/out or Boarding School dates)
                 if (d.checkIn || d.checkOut) {
-                    h += 20;
+                    h += 22 * scale;
                 }
                 if (d.notes) {
                     const lines = Math.ceil(d.notes.length / 55) || 1;
-                    h += 16 + (lines * 15);
+                    h += (16 + (lines * 15)) * scale;
                 }
                 return h;
             });
@@ -1646,6 +1761,11 @@
 
             await fetchData();
             startAutoRefresh();
+
+            // ADDED: Recalculate scale on window resize (e.g. TV orientation change)
+            window.addEventListener('resize', () => {
+                requestAnimationFrame(() => dynamicScale());
+            });
         }
 
         init();
