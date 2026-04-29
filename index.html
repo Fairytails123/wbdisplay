@@ -592,6 +592,14 @@
             border-color: #fda4af;
         }
 
+        /* Behaviour marker (1-5) — amber, matches editor 'has-value' tint */
+        .badge-behaviour {
+            background: rgba(245, 158, 11, 0.18);
+            color: #92400e;
+            border-color: rgba(245, 158, 11, 0.55);
+            font-weight: 900;
+        }
+
         /* Photo status */
         .photo-icon {
             /* MODIFIED: Scales with content volume */
@@ -1494,6 +1502,10 @@
             const notesHTML = dog.notes
                 ? `<div class="card-notes"><span class="notes-icon">📝</span>${esc(dog.notes)}</div>`
                 : '';
+            // Behaviour marker (1-5)
+            const behaviourBadge = dog.behaviour
+                ? `<span class="badge badge-behaviour" title="Behaviour ${esc(dog.behaviour)}">B${esc(dog.behaviour)}</span>`
+                : '';
 
             // Check In / Check Out dates (boarding only)
             const checkInBadge = isBoarding ? dateBadgeHTML(dog.checkIn, 'in') : '';
@@ -1530,6 +1542,7 @@
                     '<div class="card-badges">' +
                         badgeGroupsHTML +
                         crateBadge +
+                        behaviourBadge +
                         photoHTML +
                         walkHTML +
                     '</div>' +
@@ -1564,6 +1577,9 @@
             const checkOutBadge = dateBadgeHTML(dog.checkOut, 'out');
             const crateBadge = dog.crateSize
                 ? `<span class="badge badge-bs-crate">${esc(dog.crateSize)}</span>` : '';
+            const behaviourBadge = dog.behaviour
+                ? `<span class="badge badge-behaviour" title="Behaviour ${esc(dog.behaviour)}">B${esc(dog.behaviour)}</span>`
+                : '';
 
             const datesHTML = (checkInBadge || checkOutBadge)
                 ? `<div class="card-dates">${checkInBadge}${checkOutBadge}</div>`
@@ -1574,6 +1590,7 @@
                     `<span class="card-name">${esc(dog.name)}</span>` +
                     '<div class="card-badges">' +
                         crateBadge +
+                        behaviourBadge +
                     '</div>' +
                 '</div>' +
                 datesHTML +
