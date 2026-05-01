@@ -310,11 +310,12 @@
             min-height: 0;
         }
 
-        /* ADDED: Behaviour-mode board — weighted 6-section grid (B1..B5 + No marker).
+        /* ADDED: Behaviour-mode board — weighted 5-section grid.
            Hidden by default via inline style; render() swaps inline display
            between this board and #tvBoard based on state.displayMode.
-           Layout: B1 + B2 share the top row (75% height — most dogs land here);
-           B3, B4, B5, No-marker share the bottom row (25% height — sparse). */
+           Layout: top row (75% height) = B1 + B2 (most dogs).
+           Bottom row (25% height): B3 spans two columns (typical 2nd-largest
+           bucket), then a combined B4/B5 card, then No-marker. */
         .tv-board-behaviour {
             flex: 1;
             display: grid;
@@ -322,7 +323,7 @@
             grid-template-rows: 3fr 1fr;
             grid-template-areas:
                 "b1 b1 b2 b2"
-                "b3 b4 b5 bnone";
+                "b3 b3 b45 bnone";
             gap: 0.4rem;
             padding: 0.4rem;
             min-height: 0;
@@ -331,8 +332,7 @@
         .tv-board-behaviour #section-b1       { grid-area: b1; }
         .tv-board-behaviour #section-b2       { grid-area: b2; }
         .tv-board-behaviour #section-b3       { grid-area: b3; }
-        .tv-board-behaviour #section-b4       { grid-area: b4; }
-        .tv-board-behaviour #section-b5       { grid-area: b5; }
+        .tv-board-behaviour #section-b45      { grid-area: b45; }
         .tv-board-behaviour #section-bnone    { grid-area: bnone; }
 
         .board-left {
@@ -382,8 +382,7 @@
         .section-hdr.b1    { background: linear-gradient(135deg, #fde68a, #f59e0b); color: #78350f; }
         .section-hdr.b2    { background: linear-gradient(135deg, #fbbf24, #d97706); color: #ffffff; }
         .section-hdr.b3    { background: linear-gradient(135deg, #f97316, #c2410c); color: #ffffff; }
-        .section-hdr.b4    { background: linear-gradient(135deg, #ef4444, #b91c1c); color: #ffffff; }
-        .section-hdr.b5    { background: linear-gradient(135deg, #991b1b, #450a0a); color: #ffffff; }
+        .section-hdr.b45   { background: linear-gradient(135deg, #ef4444, #7f1d1d); color: #ffffff; }
         .section-hdr.bnone { background: linear-gradient(135deg, #94a3b8, #475569); color: #ffffff; }
 
         .section-hdr .s-label {
@@ -1070,19 +1069,12 @@
             </div>
             <div class="cards-area" id="cards-b3"></div>
         </div>
-        <div class="board-section" id="section-b4">
-            <div class="section-hdr b4">
-                <span class="s-label">🔴 B4</span>
-                <span class="s-count" id="count-b4">0 dogs</span>
+        <div class="board-section" id="section-b45">
+            <div class="section-hdr b45">
+                <span class="s-label">🔴 B4 / B5</span>
+                <span class="s-count" id="count-b45">0 dogs</span>
             </div>
-            <div class="cards-area" id="cards-b4"></div>
-        </div>
-        <div class="board-section" id="section-b5">
-            <div class="section-hdr b5">
-                <span class="s-label">🔴 B5</span>
-                <span class="s-count" id="count-b5">0 dogs</span>
-            </div>
-            <div class="cards-area" id="cards-b5"></div>
+            <div class="cards-area" id="cards-b45"></div>
         </div>
         <div class="board-section" id="section-bnone">
             <div class="section-hdr bnone">
@@ -1472,12 +1464,15 @@
             // serviceType — keeps Grooming + Boarding-School cards rendering via
             // their specialised layouts, and preserves the standard fd/hd/bd
             // colour borders so cards look identical to default mode.
-            renderSection('b1',    groups['1'],    getCardTypeForDog);
-            renderSection('b2',    groups['2'],    getCardTypeForDog);
-            renderSection('b3',    groups['3'],    getCardTypeForDog);
-            renderSection('b4',    groups['4'],    getCardTypeForDog);
-            renderSection('b5',    groups['5'],    getCardTypeForDog);
-            renderSection('bnone', groups['none'], getCardTypeForDog);
+            //
+            // B4 + B5 dogs share a single combined section (typically just 1-2 dogs
+            // total). Concatenated B4-first-then-B5: each block stays alphabetical
+            // and the B-badge on each card preserves the marker distinction.
+            renderSection('b1',    groups['1'],                          getCardTypeForDog);
+            renderSection('b2',    groups['2'],                          getCardTypeForDog);
+            renderSection('b3',    groups['3'],                          getCardTypeForDog);
+            renderSection('b45',   [...groups['4'], ...groups['5']],     getCardTypeForDog);
+            renderSection('bnone', groups['none'],                       getCardTypeForDog);
         }
 
         // ================================================================
