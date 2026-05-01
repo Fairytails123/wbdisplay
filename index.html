@@ -313,17 +313,17 @@
         /* ADDED: Behaviour-mode board — weighted 5-section grid.
            Hidden by default via inline style; render() swaps inline display
            between this board and #tvBoard based on state.displayMode.
-           Layout: top row (75% height) = B1 + B2 (most dogs).
-           Bottom row (25% height): B3 spans two columns (typical 2nd-largest
-           bucket), then a combined B4/B5 card, then No-marker. */
+           8-column grid lets us split each row independently:
+             Top row (75% height):    B1 = 6/8 cols (75%) | B2 = 2/8 cols (25%)
+             Bottom row (25% height): B3 = 4/8 (50%) | B4/B5 = 2/8 (25%) | No-marker = 2/8 (25%) */
         .tv-board-behaviour {
             flex: 1;
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
+            grid-template-columns: repeat(8, 1fr);
             grid-template-rows: 3fr 1fr;
             grid-template-areas:
-                "b1 b1 b2 b2"
-                "b3 b3 b45 bnone";
+                "b1 b1 b1 b1 b1 b1 b2 b2"
+                "b3 b3 b3 b3 b45 b45 bnone bnone";
             gap: 0.4rem;
             padding: 0.4rem;
             min-height: 0;
