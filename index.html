@@ -237,6 +237,50 @@
             opacity: 0.6;
         }
 
+        /* ADDED: Behaviour-mode toggle button + status pill (live in tabs nav).
+           Toggle flips state.displayMode between 'default' and 'behaviour'. */
+        .mode-toggle-btn {
+            margin-left: auto;
+            margin-right: 0.5rem;
+            padding: 0.3rem 0.85rem;
+            font-size: 0.65rem;
+            font-weight: 800;
+            font-family: inherit;
+            background: rgba(245, 158, 11, 0.12);
+            color: #92400e;
+            border: 1px solid rgba(245, 158, 11, 0.45);
+            border-radius: 1rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .mode-toggle-btn:hover { background: rgba(245, 158, 11, 0.25); }
+        body.mode-behaviour .mode-toggle-btn {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #ffffff;
+            border-color: #b45309;
+        }
+
+        .behaviour-mode-pill {
+            display: none;
+            align-items: center;
+            gap: 0.3rem;
+            margin-right: 0.5rem;
+            padding: 0.25rem 0.6rem;
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: #92400e;
+            background: rgba(245, 158, 11, 0.18);
+            border: 1px solid rgba(245, 158, 11, 0.55);
+            border-radius: 1rem;
+            white-space: nowrap;
+        }
+        body.mode-behaviour .behaviour-mode-pill { display: inline-flex; }
+
+        /* When the toggle button is present, it claims the auto margin and the
+           tab-hint just packs after it instead of also pushing right. */
+        .tv-tabs .mode-toggle-btn ~ .tab-hint { margin-left: 0; }
+
         /* ======================== REFRESH BAR ======================== */
         .refresh-track {
             height: 3px;
@@ -265,6 +309,20 @@
             padding: 0.4rem;
             min-height: 0;
         }
+
+        /* ADDED: Behaviour-mode board — flat 6-section grid (B1..B5 + No marker).
+           Hidden by default via inline style; render() swaps inline display
+           between this board and #tvBoard based on state.displayMode. */
+        .tv-board-behaviour {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 0.4rem;
+            padding: 0.4rem;
+            min-height: 0;
+        }
+        .tv-board-behaviour .board-section { min-height: 0; }
 
         .board-left {
             display: flex;
@@ -308,6 +366,14 @@
         .section-hdr.boarding { background: var(--bd-grad); }
         .section-hdr.grooming { background: var(--gm-grad); }
         .section-hdr.boarding-school { background: var(--bs-grad); }
+
+        /* ADDED: Behaviour-mode section header gradients (amber → deep red severity scale) */
+        .section-hdr.b1    { background: linear-gradient(135deg, #fde68a, #f59e0b); color: #78350f; }
+        .section-hdr.b2    { background: linear-gradient(135deg, #fbbf24, #d97706); color: #ffffff; }
+        .section-hdr.b3    { background: linear-gradient(135deg, #f97316, #c2410c); color: #ffffff; }
+        .section-hdr.b4    { background: linear-gradient(135deg, #ef4444, #b91c1c); color: #ffffff; }
+        .section-hdr.b5    { background: linear-gradient(135deg, #991b1b, #450a0a); color: #ffffff; }
+        .section-hdr.bnone { background: linear-gradient(135deg, #94a3b8, #475569); color: #ffffff; }
 
         .section-hdr .s-label {
             display: flex;
@@ -897,6 +963,9 @@
         <button class="tab-btn active" data-tab="today" tabindex="1" onclick="switchTab('today')">📅 TODAY</button>
         <button class="tab-btn" data-tab="tomorrow" tabindex="2" onclick="switchTab('tomorrow')">📆 TOMORROW</button>
         <button class="tab-btn" data-tab="boarding-plan" tabindex="3" onclick="switchTab('boarding-plan')">📋 BOARDING PLAN</button>
+        <!-- ADDED: Behaviour-mode toggle. Press B on remote/keyboard, click here, or load with ?mode=behaviour. -->
+        <button class="mode-toggle-btn" id="modeToggleBtn" tabindex="4" onclick="toggleDisplayMode()" title="Toggle behaviour-marker grouping (B)">🐾 Group by Behaviour</button>
+        <span class="behaviour-mode-pill" id="behaviourPill">⚠️ Behaviour mode · auto-off in <span id="behaviourCountdown">2h 0m</span></span>
         <span class="tab-hint">◀ ▶ Use remote arrows to switch</span>
     </nav>
 
@@ -959,6 +1028,57 @@
                 </div>
                 <div class="cards-area" id="cards-gm"></div>
             </div>
+        </div>
+    </main>
+
+    <!-- ============ BEHAVIOUR-MODE BOARD (temporary view) ============
+         ADDED: Alternate flat 6-section board used when state.displayMode === 'behaviour'.
+         Same .board-section / .section-hdr / .cards-area structure so renderSection()
+         works without modification. Hidden by default; render() swaps inline display
+         between this and #tvBoard. The underlying dog data and default layout are
+         untouched — toggling behaviour mode does NOT modify state.data or the sheet. -->
+    <main class="tv-board-behaviour" id="tvBoardBehaviour" style="display:none;">
+        <div class="board-section" id="section-b1">
+            <div class="section-hdr b1">
+                <span class="s-label">🟡 B1</span>
+                <span class="s-count" id="count-b1">0 dogs</span>
+            </div>
+            <div class="cards-area" id="cards-b1"></div>
+        </div>
+        <div class="board-section" id="section-b2">
+            <div class="section-hdr b2">
+                <span class="s-label">🟠 B2</span>
+                <span class="s-count" id="count-b2">0 dogs</span>
+            </div>
+            <div class="cards-area" id="cards-b2"></div>
+        </div>
+        <div class="board-section" id="section-b3">
+            <div class="section-hdr b3">
+                <span class="s-label">🟠 B3</span>
+                <span class="s-count" id="count-b3">0 dogs</span>
+            </div>
+            <div class="cards-area" id="cards-b3"></div>
+        </div>
+        <div class="board-section" id="section-b4">
+            <div class="section-hdr b4">
+                <span class="s-label">🔴 B4</span>
+                <span class="s-count" id="count-b4">0 dogs</span>
+            </div>
+            <div class="cards-area" id="cards-b4"></div>
+        </div>
+        <div class="board-section" id="section-b5">
+            <div class="section-hdr b5">
+                <span class="s-label">🔴 B5</span>
+                <span class="s-count" id="count-b5">0 dogs</span>
+            </div>
+            <div class="cards-area" id="cards-b5"></div>
+        </div>
+        <div class="board-section" id="section-bnone">
+            <div class="section-hdr bnone">
+                <span class="s-label">⚪ No marker</span>
+                <span class="s-count" id="count-bnone">0 dogs</span>
+            </div>
+            <div class="cards-area" id="cards-bnone"></div>
         </div>
     </main>
 
@@ -1032,6 +1152,16 @@
             CONFIG.BOARDING_PLANNER_URL = customBoardingUrl;
         }
 
+        // ADDED: Behaviour-mode initial state from URL param: ?mode=behaviour
+        // Default is 'default' (van-grouped permanent layout). 'behaviour' regroups
+        // dogs into B1..B5 + No-marker buckets without changing any underlying data.
+        const initialDisplayMode = urlParams.get('mode') === 'behaviour' ? 'behaviour' : 'default';
+
+        // ADDED: Auto-revert window for behaviour mode. After this many ms in behaviour
+        // mode without user interaction, the TV flips back to default. Belt-and-braces
+        // safety so a forgotten mode doesn't persist into the next day.
+        const BEHAVIOUR_MODE_AUTO_REVERT_MS = 2 * 60 * 60 * 1000; // 2 hours
+
         // ================================================================
         //  STATE
         // ================================================================
@@ -1042,7 +1172,11 @@
             loading: true,
             error: false,
             firstLoad: true,
-            boardingPlannerLoaded: false  // ADDED: Tracks whether the iframe has been injected
+            boardingPlannerLoaded: false,  // ADDED: Tracks whether the iframe has been injected
+            displayMode: initialDisplayMode,  // ADDED: 'default' | 'behaviour' (render-only flag)
+            behaviourModeTimer: null,         // ADDED: setTimeout id for auto-revert
+            behaviourModeStartedAt: null,     // ADDED: epoch-ms; for countdown pill
+            behaviourCountdownTimer: null     // ADDED: setInterval id for countdown updater
         };
 
         // ================================================================
@@ -1153,6 +1287,26 @@
             const tabData = state.data?.[state.tab];
             if (!tabData) return;
 
+            // ADDED: Mode-aware board visibility. Toggle inline display so the
+            // boarding-plan tab logic in switchTab() (which sets tvBoard.style.display
+            // = 'none') keeps working unchanged. body.mode-behaviour drives the
+            // toggle button + pill styling via CSS.
+            const tvBoard = document.getElementById('tvBoard');
+            const tvBoardBehaviour = document.getElementById('tvBoardBehaviour');
+            if (state.displayMode === 'behaviour') {
+                tvBoard.style.display = 'none';
+                tvBoardBehaviour.style.display = 'grid';
+                document.body.classList.add('mode-behaviour');
+                // Reset --content-scale so the 6-section grid renders at natural size
+                // rather than carrying over a shrink factor from the dense default board.
+                document.documentElement.style.setProperty('--content-scale', '1');
+                lastScale = 1;
+            } else {
+                tvBoard.style.display = '';
+                tvBoardBehaviour.style.display = 'none';
+                document.body.classList.remove('mode-behaviour');
+            }
+
             renderStats(tabData);
             renderVanTimes(tabData.vanTimes);
             renderAllSections(tabData.dogs || []);
@@ -1160,9 +1314,13 @@
 
             // ADDED: Recalculate dynamic content scaling after all sections are rendered.
             // Uses requestAnimationFrame to ensure the DOM has fully laid out before measuring.
-            requestAnimationFrame(() => {
-                dynamicScale();
-            });
+            // Skipped in behaviour mode — that board uses a flat grid that doesn't need
+            // the right-column proportional sizing dynamicScale was designed for.
+            if (state.displayMode === 'default') {
+                requestAnimationFrame(() => {
+                    dynamicScale();
+                });
+            }
         }
 
         // ---- Stats ----
@@ -1203,6 +1361,15 @@
 
         // ---- Board Sections ----
         function renderAllSections(dogs) {
+            // ADDED: Behaviour-mode short-circuit. Renders into the alternate
+            // #tvBoardBehaviour DOM tree and returns BEFORE any default-mode logic
+            // runs, so the existing van-grouped layout is bit-for-bit untouched
+            // when displayMode === 'default'.
+            if (state.displayMode === 'behaviour') {
+                renderByBehaviour(dogs);
+                return;
+            }
+
             const groups = { 'Full Day': [], 'Half Day AM': [], 'Boarding': [], 'Grooming': [], 'Boarding School': [] };
 
             dogs.forEach(d => {
@@ -1262,6 +1429,44 @@
                 groups['Boarding School'].length,
                 groups['Grooming'].length
             );
+        }
+
+        // ================================================================
+        //  ADDED: BEHAVIOUR-MODE GROUPING (TEMPORARY VIEW)
+        //  Buckets dogs by their behaviour marker (B1..B5) plus a No-marker
+        //  bucket. Reuses renderSection() and renderCard() unchanged so cards
+        //  look identical to default mode (B-badges, van tints, photo/walk
+        //  indicators, notes — all preserved). Skips the van secondary sort:
+        //  staff scanning for B-marked dogs want pure alphabetical order
+        //  inside each bucket — that's the whole point of this mode.
+        //  The default-mode renderAllSections() above is left untouched.
+        // ================================================================
+        function renderByBehaviour(dogs) {
+            const groups = { '1': [], '2': [], '3': [], '4': [], '5': [], 'none': [] };
+
+            dogs.forEach(d => {
+                const raw = String(d.behaviour || '').trim();
+                if (raw === '1' || raw === '2' || raw === '3' || raw === '4' || raw === '5') {
+                    groups[raw].push(d);
+                } else {
+                    groups['none'].push(d);
+                }
+            });
+
+            // Reuse the same alphabetical comparator as default mode for consistency.
+            const nameSort = (a, b) => (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' });
+            Object.values(groups).forEach(group => group.sort(nameSort));
+
+            // Pass getCardTypeForDog so each card derives its type from the dog's
+            // serviceType — keeps Grooming + Boarding-School cards rendering via
+            // their specialised layouts, and preserves the standard fd/hd/bd
+            // colour borders so cards look identical to default mode.
+            renderSection('b1',    groups['1'],    getCardTypeForDog);
+            renderSection('b2',    groups['2'],    getCardTypeForDog);
+            renderSection('b3',    groups['3'],    getCardTypeForDog);
+            renderSection('b4',    groups['4'],    getCardTypeForDog);
+            renderSection('b5',    groups['5'],    getCardTypeForDog);
+            renderSection('bnone', groups['none'], getCardTypeForDog);
         }
 
         // ================================================================
@@ -1343,11 +1548,29 @@
             const cols = calcColumns(dogs, container);
             const distributed = distributeColumns(dogs, cols);
 
+            // ADDED: type may be a string (default mode — same type for whole section)
+            // or a function (behaviour mode — derive per-dog type from serviceType so
+            // Grooming/Boarding-School dogs still render via their specialised cards).
+            // String callers are unaffected.
+            const typeOf = typeof type === 'function' ? type : () => type;
+
             container.innerHTML = distributed.map(colDogs =>
                 '<div class="cards-col">' +
-                colDogs.map(d => renderCard(d, type)).join('') +
+                colDogs.map(d => renderCard(d, typeOf(d))).join('') +
                 '</div>'
             ).join('');
+        }
+
+        // ADDED: Derive renderCard type ('fd'|'hd'|'bd'|'bs'|'gm') from a dog's serviceType.
+        // Mirrors the bucketing in default-mode renderAllSections() so behaviour-mode
+        // cards are visually identical to default-mode cards for the same dog.
+        function getCardTypeForDog(d) {
+            const t = (d.serviceType || 'Full Day');
+            if (t === 'Grooming')           return 'gm';
+            if (t === 'Boarding School')    return 'bs';
+            if (t.includes('Half Day'))     return 'hd';
+            if (t.includes('Boarding'))     return 'bd';
+            return 'fd';
         }
 
         function calcColumns(dogs, container) {
@@ -1655,6 +1878,63 @@
         }
 
         // ================================================================
+        //  ADDED: BEHAVIOUR-MODE TOGGLE (TEMPORARY VIEW)
+        //  Flips state.displayMode and re-renders instantly from cached data.
+        //  Auto-reverts after BEHAVIOUR_MODE_AUTO_REVERT_MS as a safety net.
+        //  Triggered by: header button, 'B' keyboard/remote key, or page load
+        //  with ?mode=behaviour. Does NOT write to GAS or the sheet.
+        // ================================================================
+        function toggleDisplayMode() {
+            const goingToBehaviour = state.displayMode !== 'behaviour';
+            state.displayMode = goingToBehaviour ? 'behaviour' : 'default';
+
+            // Clear any existing timers
+            if (state.behaviourModeTimer)     { clearTimeout(state.behaviourModeTimer); state.behaviourModeTimer = null; }
+            if (state.behaviourCountdownTimer){ clearInterval(state.behaviourCountdownTimer); state.behaviourCountdownTimer = null; }
+
+            if (goingToBehaviour) {
+                state.behaviourModeStartedAt = Date.now();
+                state.behaviourModeTimer = setTimeout(() => {
+                    state.displayMode = 'default';
+                    state.behaviourModeTimer = null;
+                    if (state.behaviourCountdownTimer) {
+                        clearInterval(state.behaviourCountdownTimer);
+                        state.behaviourCountdownTimer = null;
+                    }
+                    updateModeToggleButton();
+                    render();
+                }, BEHAVIOUR_MODE_AUTO_REVERT_MS);
+                state.behaviourCountdownTimer = setInterval(updateBehaviourCountdown, 30 * 1000);
+                updateBehaviourCountdown();
+            } else {
+                state.behaviourModeStartedAt = null;
+            }
+
+            updateModeToggleButton();
+            render();
+        }
+
+        // ADDED: Keep the toggle button label in sync with state.
+        function updateModeToggleButton() {
+            const btn = document.getElementById('modeToggleBtn');
+            if (!btn) return;
+            btn.textContent = state.displayMode === 'behaviour'
+                ? '↩ Back to Default View'
+                : '🐾 Group by Behaviour';
+        }
+
+        // ADDED: Refresh the "auto-off in Xh Ym" pill text.
+        function updateBehaviourCountdown() {
+            const pillText = document.getElementById('behaviourCountdown');
+            if (!pillText || state.displayMode !== 'behaviour' || !state.behaviourModeStartedAt) return;
+            const elapsed = Date.now() - state.behaviourModeStartedAt;
+            const remaining = Math.max(0, BEHAVIOUR_MODE_AUTO_REVERT_MS - elapsed);
+            const hours = Math.floor(remaining / (60 * 60 * 1000));
+            const mins  = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+            pillText.textContent = hours + 'h ' + mins + 'm';
+        }
+
+        // ================================================================
         //  TAB SWITCHING
         // ================================================================
         function switchTab(tab) {
@@ -1666,10 +1946,13 @@
             // ADDED: Toggle visibility between main board and Boarding Planner iframe
             const mainBoard = document.getElementById('tvBoard');
             const bpContainer = document.getElementById('boardingPlannerContainer');
+            // ADDED: Behaviour-mode board must also be hidden on boarding-plan tab.
+            const behaviourBoard = document.getElementById('tvBoardBehaviour');
 
             if (tab === 'boarding-plan') {
                 // Hide main board, show Boarding Planner
                 mainBoard.style.display = 'none';
+                if (behaviourBoard) behaviourBoard.style.display = 'none';
                 bpContainer.classList.add('active');
 
                 // Lazy-load the iframe on first activation
@@ -1682,7 +1965,8 @@
                     state.boardingPlannerLoaded = true;
                 }
             } else {
-                // Show main board, hide Boarding Planner
+                // Show main board, hide Boarding Planner. render() will pick the
+                // correct board (default vs behaviour) based on state.displayMode.
                 mainBoard.style.display = '';
                 bpContainer.classList.remove('active');
                 render();
@@ -1706,6 +1990,15 @@
                     nextIdx = (currentIdx - 1 + TAB_ORDER.length) % TAB_ORDER.length;
                 }
                 switchTab(TAB_ORDER[nextIdx]);
+                return;
+            }
+            // ADDED: 'B' toggles behaviour-marker grouping mode. Skipped if a text
+            // input has focus so it doesn't intercept typing in any future input.
+            if (e.key === 'b' || e.key === 'B') {
+                const tag = (document.activeElement && document.activeElement.tagName) || '';
+                if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+                e.preventDefault();
+                toggleDisplayMode();
             }
         });
 
@@ -1775,6 +2068,25 @@
         async function init() {
             updateClock();
             setInterval(updateClock, CONFIG.CLOCK_INTERVAL);
+
+            // ADDED: If page loaded with ?mode=behaviour, kick off the auto-revert
+            // timer + countdown so the URL-param entry path matches the toggle path.
+            if (state.displayMode === 'behaviour') {
+                state.behaviourModeStartedAt = Date.now();
+                state.behaviourModeTimer = setTimeout(() => {
+                    state.displayMode = 'default';
+                    state.behaviourModeTimer = null;
+                    if (state.behaviourCountdownTimer) {
+                        clearInterval(state.behaviourCountdownTimer);
+                        state.behaviourCountdownTimer = null;
+                    }
+                    updateModeToggleButton();
+                    render();
+                }, BEHAVIOUR_MODE_AUTO_REVERT_MS);
+                state.behaviourCountdownTimer = setInterval(updateBehaviourCountdown, 30 * 1000);
+                updateBehaviourCountdown();
+            }
+            updateModeToggleButton();
 
             await fetchData();
             startAutoRefresh();
