@@ -310,19 +310,30 @@
             min-height: 0;
         }
 
-        /* ADDED: Behaviour-mode board — flat 6-section grid (B1..B5 + No marker).
+        /* ADDED: Behaviour-mode board — weighted 6-section grid (B1..B5 + No marker).
            Hidden by default via inline style; render() swaps inline display
-           between this board and #tvBoard based on state.displayMode. */
+           between this board and #tvBoard based on state.displayMode.
+           Layout: B1 + B2 share the top row (75% height — most dogs land here);
+           B3, B4, B5, No-marker share the bottom row (25% height — sparse). */
         .tv-board-behaviour {
             flex: 1;
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(2, 1fr);
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            grid-template-rows: 3fr 1fr;
+            grid-template-areas:
+                "b1 b1 b2 b2"
+                "b3 b4 b5 bnone";
             gap: 0.4rem;
             padding: 0.4rem;
             min-height: 0;
         }
-        .tv-board-behaviour .board-section { min-height: 0; }
+        .tv-board-behaviour .board-section    { min-height: 0; }
+        .tv-board-behaviour #section-b1       { grid-area: b1; }
+        .tv-board-behaviour #section-b2       { grid-area: b2; }
+        .tv-board-behaviour #section-b3       { grid-area: b3; }
+        .tv-board-behaviour #section-b4       { grid-area: b4; }
+        .tv-board-behaviour #section-b5       { grid-area: b5; }
+        .tv-board-behaviour #section-bnone    { grid-area: bnone; }
 
         .board-left {
             display: flex;
