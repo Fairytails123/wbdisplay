@@ -534,6 +534,45 @@
         .dog-card.vg-sv   { background: #d1fae5; } /* Green tint — matches SV badge palette */
         .dog-card.vg-dv   { background: #fef3c7; } /* Amber tint — matches DV badge palette */
 
+        /* ADDED: Report-done feature (Today tab only). The [data-dog-name] selector
+           naturally scopes hover/focus styles to Today cards — Tomorrow cards omit
+           that attribute so they keep identical visuals to before. */
+        .dog-card[data-dog-name] { cursor: pointer; position: relative; }
+
+        /* Hover ring — pointer-style remotes (LG Magic, Samsung One) */
+        .dog-card[data-dog-name]:hover {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.45);
+            z-index: 1;
+        }
+
+        /* Focus ring — D-pad / keyboard remotes */
+        .dog-card[data-dog-name]:focus,
+        .dog-card[data-dog-name]:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 4px var(--brand);
+            z-index: 2;
+        }
+
+        /* Done-state: substantial fade so finished dogs are obvious at a glance.
+           No strikethrough on the name — checkbox + dim card only. */
+        .dog-card.report-done { opacity: 0.45; }
+
+        /* The checkbox itself */
+        .report-toggle {
+            display: inline-flex;
+            align-items: center;
+            margin-left: calc(0.35rem * var(--content-scale));
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        .report-checkbox {
+            width: calc(1.1rem * var(--content-scale));
+            height: calc(1.1rem * var(--content-scale));
+            accent-color: var(--brand);
+            cursor: pointer;
+            margin: 0;
+        }
+
         .card-main {
             display: flex;
             align-items: center;
@@ -1179,7 +1218,10 @@
             displayMode: initialDisplayMode,  // ADDED: 'default' | 'behaviour' (render-only flag)
             behaviourModeTimer: null,         // ADDED: setTimeout id for auto-revert
             behaviourModeStartedAt: null,     // ADDED: epoch-ms; for countdown pill
-            behaviourCountdownTimer: null     // ADDED: setInterval id for countdown updater
+            behaviourCountdownTimer: null,    // ADDED: setInterval id for countdown updater
+            // ADDED: Report-done feature (Today tab only). Keyed by dog.name; resets at midnight.
+            reportsDone: {},                  // { dogName: true } — current day's completed reports
+            reportsDoneDate: null             // 'YYYY-MM-DD' — date the above belongs to
         };
 
         // ================================================================
@@ -1697,6 +1739,82 @@
             `</div>`;
         }
 
+        // ================================================================
+        //  ADDED: REPORT-DONE FEATURE (Today tab only)
+        //  Tracks which dogs have had their end-of-day report completed.
+        //  State lives in memory + localStorage; resets at midnight so a
+        //  fresh day starts with no checks. Keyed by dog.name (only the
+        //  Today tab renders checkboxes, so no tab namespacing needed).
+        // ================================================================
+        const REPORTS_STORAGE_KEY = 'tvDisplayReportsDone';
+
+        function todayKey() {
+            // Local-date YYYY-MM-DD (matches staff clock, not UTC)
+            return new Date().toLocaleDateString('en-CA');
+        }
+
+        function loadReportsDone() {
+            try {
+                const raw = localStorage.getItem(REPORTS_STORAGE_KEY);
+                if (!raw) {
+                    state.reportsDone = {};
+                    state.reportsDoneDate = todayKey();
+                    return;
+                }
+                const parsed = JSON.parse(raw);
+                if (parsed.date !== todayKey()) {
+                    // Different day — wipe yesterday's checks
+                    localStorage.removeItem(REPORTS_STORAGE_KEY);
+                    state.reportsDone = {};
+                } else {
+                    state.reportsDone = parsed.done || {};
+                }
+                state.reportsDoneDate = todayKey();
+            } catch (_) {
+                state.reportsDone = {};
+                state.reportsDoneDate = todayKey();
+            }
+        }
+
+        function persistReportsDone() {
+            try {
+                localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify({
+                    date: todayKey(),
+                    done: state.reportsDone
+                }));
+            } catch (_) { /* quota / privacy mode — best effort */ }
+        }
+
+        function ensureFreshDay() {
+            // Guard against the page being left open past midnight
+            if (state.reportsDoneDate !== todayKey()) {
+                state.reportsDone = {};
+                state.reportsDoneDate = todayKey();
+                persistReportsDone();
+            }
+        }
+
+        function isReportDone(dogName) {
+            ensureFreshDay();
+            return !!state.reportsDone[dogName];
+        }
+
+        function toggleReport(dogName) {
+            ensureFreshDay();
+            if (state.reportsDone[dogName]) delete state.reportsDone[dogName];
+            else state.reportsDone[dogName] = true;
+            persistReportsDone();
+        }
+
+        function reportToggleHTML(dog) {
+            // Only render checkbox on the Today tab
+            if (state.tab !== 'today') return '';
+            const checked = isReportDone(dog.name) ? 'checked' : '';
+            return `<label class="report-toggle" title="Report done">` +
+                   `<input type="checkbox" class="report-checkbox" ${checked} tabindex="-1">` +
+                   `</label>`;
+        }
+
         // ---- Card HTML ----
         function renderCard(dog, type) {
             const isBoarding = type === 'bd';
@@ -1765,7 +1883,12 @@
                 ? `<div class="card-dates">${checkInBadge}${checkOutBadge}</div>`
                 : '';
 
-            return `<div class="dog-card ${cardClass} ${getVanGroupClass(dog)}">` +
+            // ADDED: Report-done feature (Today tab only). Focus attrs + done class
+            // are gated on state.tab === 'today' so Tomorrow's HTML is byte-identical.
+            const doneClass = (state.tab === 'today' && isReportDone(dog.name)) ? ' report-done' : '';
+            const focusAttrs = state.tab === 'today' ? ` tabindex="0" data-dog-name="${esc(dog.name)}"` : '';
+
+            return `<div class="dog-card ${cardClass} ${getVanGroupClass(dog)}${doneClass}"${focusAttrs}>` +
                 '<div class="card-main">' +
                     `<span class="card-name">${esc(dog.name)}</span>` +
                     '<div class="card-badges">' +
@@ -1775,6 +1898,7 @@
                         photoHTML +
                         walkHTML +
                     '</div>' +
+                    reportToggleHTML(dog) +
                 '</div>' +
                 datesHTML +
                 notesHTML +
@@ -1790,12 +1914,17 @@
             const vanBadge = dog.vanType
                 ? `<span class="badge ${vpClass(dog.vanType)}">${esc(dog.vanType)}</span>` : '';
 
-            return `<div class="dog-card gm-card ${getVanGroupClass(dog)}">` +
+            // ADDED: Report-done feature (Today tab only)
+            const doneClass = (state.tab === 'today' && isReportDone(dog.name)) ? ' report-done' : '';
+            const focusAttrs = state.tab === 'today' ? ` tabindex="0" data-dog-name="${esc(dog.name)}"` : '';
+
+            return `<div class="dog-card gm-card ${getVanGroupClass(dog)}${doneClass}"${focusAttrs}>` +
                 '<div class="card-main">' +
                     `<span class="card-name">${esc(dog.name)}</span>` +
                     '<div class="card-badges">' +
                         pickupBadge + dropoffBadge + vanBadge +
                     '</div>' +
+                    reportToggleHTML(dog) +
                 '</div>' +
             '</div>';
         }
@@ -1814,13 +1943,18 @@
                 ? `<div class="card-dates">${checkInBadge}${checkOutBadge}</div>`
                 : '';
 
-            return `<div class="dog-card bs-card ${getVanGroupClass(dog)}">` +
+            // ADDED: Report-done feature (Today tab only)
+            const doneClass = (state.tab === 'today' && isReportDone(dog.name)) ? ' report-done' : '';
+            const focusAttrs = state.tab === 'today' ? ` tabindex="0" data-dog-name="${esc(dog.name)}"` : '';
+
+            return `<div class="dog-card bs-card ${getVanGroupClass(dog)}${doneClass}"${focusAttrs}>` +
                 '<div class="card-main">' +
                     `<span class="card-name">${esc(dog.name)}</span>` +
                     '<div class="card-badges">' +
                         crateBadge +
                         behaviourBadge +
                     '</div>' +
+                    reportToggleHTML(dog) +
                 '</div>' +
                 datesHTML +
             '</div>';
@@ -2009,6 +2143,48 @@
         });
 
         // ================================================================
+        //  ADDED: REPORT-DONE INTERACTION HANDLERS
+        //  Delegated at document level so they survive the 97s re-render
+        //  that wipes and rebuilds every card. Only act on cards that
+        //  carry [data-dog-name] (Today tab only).
+        // ================================================================
+
+        // Click anywhere on a Today-tab dog card to toggle its report status.
+        document.addEventListener('click', e => {
+            const card = e.target.closest('.dog-card[data-dog-name]');
+            if (!card) return;
+
+            // If the native checkbox was clicked, suppress its built-in toggle —
+            // we'll toggle once via toggleReport() and sync the checkbox below.
+            if (e.target.matches('input.report-checkbox')) {
+                e.preventDefault();
+            }
+
+            const name = card.dataset.dogName;
+            toggleReport(name);
+
+            const cb = card.querySelector('input.report-checkbox');
+            const done = isReportDone(name);
+            if (cb) cb.checked = done;
+            card.classList.toggle('report-done', done);
+        });
+
+        // Space / Enter on a focused card toggles it (D-pad "OK" support).
+        // Existing ArrowLeft/Right + 'B' handler above is unmodified.
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            const ae = document.activeElement;
+            if (!ae || !ae.matches || !ae.matches('.dog-card[data-dog-name]')) return;
+            e.preventDefault();
+            const name = ae.dataset.dogName;
+            toggleReport(name);
+            const cb = ae.querySelector('input.report-checkbox');
+            const done = isReportDone(name);
+            if (cb) cb.checked = done;
+            ae.classList.toggle('report-done', done);
+        });
+
+        // ================================================================
         //  CLOCK
         // ================================================================
         function updateClock() {
@@ -2072,6 +2248,10 @@
         //  INITIALISATION
         // ================================================================
         async function init() {
+            // ADDED: Hydrate report-done state from localStorage before the first
+            // render so checks restore on reload (within the same day).
+            loadReportsDone();
+
             updateClock();
             setInterval(updateClock, CONFIG.CLOCK_INTERVAL);
 
