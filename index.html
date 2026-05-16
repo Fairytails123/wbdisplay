@@ -928,6 +928,131 @@
 
         .data-flash { animation: flash-card 0.8s ease-out; }
 
+        /* ======================== CHECK-IN / CHECK-OUT TAB ======================== */
+        /* ADDED: Dedicated tab showing four colour-coded buckets of dogs based on
+           today/tomorrow check-in and check-out status. Data is sourced from the
+           Boarding Planner Apps Script (?mode=checkinout) which itself is backed
+           by a PropertiesService snapshot refreshed exactly twice per day
+           (07:00 and 19:00 Europe/London) — so opening this tab causes ZERO
+           Acuity API calls. */
+
+        /* Section accent colours — each bucket gets its own distinct hue drawn
+           from the existing palette so the rest of the board still feels unified. */
+        :root {
+            /* Check-in Today  → green (success / arrival) */
+            --cio-in-today-accent: #16a34a;
+            --cio-in-today-grad:   linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+            --cio-in-today-bg:     #f0fdf4;
+
+            /* Check-out Today → amber (leaving today, attention) */
+            --cio-out-today-accent: #d97706;
+            --cio-out-today-grad:   linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+            --cio-out-today-bg:     #fffbeb;
+
+            /* Check-in Tomorrow → brand blue (arriving next) */
+            --cio-in-tomorrow-accent: #007ba8;
+            --cio-in-tomorrow-grad:   linear-gradient(135deg, #00acee 0%, #007ba8 100%);
+            --cio-in-tomorrow-bg:     #f0f7ff;
+
+            /* Check-out Tomorrow → purple (leaving next) */
+            --cio-out-tomorrow-accent: #7c3aed;
+            --cio-out-tomorrow-grad:   linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
+            --cio-out-tomorrow-bg:     #f5f3ff;
+        }
+
+        /* Container — hidden by default; switchTab('checkinout') flips it on */
+        .checkinout-board {
+            flex: 1;
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 0.4rem;
+            padding: 0.4rem;
+            min-height: 0;
+        }
+        .checkinout-board.active { display: grid; }
+
+        /* Each quadrant uses the same .board-section / .section-hdr / .cards-area
+           structure as the rest of the board, so card rendering stays consistent. */
+        .cio-section .section-hdr.cio-in-today    { background: var(--cio-in-today-grad); }
+        .cio-section .section-hdr.cio-out-today   { background: var(--cio-out-today-grad); }
+        .cio-section .section-hdr.cio-in-tomorrow { background: var(--cio-in-tomorrow-grad); }
+        .cio-section .section-hdr.cio-out-tomorrow{ background: var(--cio-out-tomorrow-grad); }
+
+        /* Compact card style — these lists are name-only, no walks/photos/vans,
+           so we can pack more in. Mirrors .dog-card structure for visual familiarity. */
+        .cio-card {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: calc(0.3rem * var(--content-scale)) calc(0.55rem * var(--content-scale));
+            font-size: calc(0.85rem * var(--content-scale));
+            font-weight: 700;
+            border-radius: 0.3rem;
+            border: 1px solid var(--border);
+            border-left-width: 4px;
+            background: var(--card);
+        }
+
+        /* Per-bucket card tint + accent stripe */
+        .cards-area.cio-in-today    .cio-card { border-left-color: var(--cio-in-today-accent);    background: var(--cio-in-today-bg); }
+        .cards-area.cio-out-today   .cio-card { border-left-color: var(--cio-out-today-accent);   background: var(--cio-out-today-bg); }
+        .cards-area.cio-in-tomorrow .cio-card { border-left-color: var(--cio-in-tomorrow-accent); background: var(--cio-in-tomorrow-bg); }
+        .cards-area.cio-out-tomorrow .cio-card{ border-left-color: var(--cio-out-tomorrow-accent);background: var(--cio-out-tomorrow-bg); }
+
+        /* Cards-area for this tab uses vertical stacking so dog names read top-to-bottom. */
+        .checkinout-board .cards-area {
+            flex-direction: column;
+            align-content: flex-start;
+            gap: calc(0.25rem * var(--content-scale));
+            overflow-y: auto;
+        }
+
+        /* Dog name + small type badge (Holiday / School) */
+        .cio-card .cio-name {
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .cio-card .cio-badge {
+            font-size: calc(0.55rem * var(--content-scale));
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: calc(0.05rem * var(--content-scale)) calc(0.35rem * var(--content-scale));
+            border-radius: 0.6rem;
+            background: rgba(0,0,0,0.06);
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+        .cio-card .cio-badge.boarding { background: rgba(0,172,238,0.18); color: #007ba8; }
+        .cio-card .cio-badge.school   { background: rgba(139,92,246,0.18); color: #6d28d9; }
+
+        /* Empty state inside a quadrant */
+        .cio-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-weight: 700;
+            font-size: calc(0.7rem * var(--content-scale));
+            opacity: 0.6;
+            padding: 0.6rem;
+        }
+
+        /* Small "last refreshed" stamp shown in each header */
+        .cio-section .section-hdr .cio-refreshed {
+            font-size: calc(0.5rem * var(--content-scale));
+            font-weight: 700;
+            opacity: 0.85;
+            background: rgba(255,255,255,0.22);
+            padding: calc(0.05rem * var(--content-scale)) calc(0.35rem * var(--content-scale));
+            border-radius: 0.6rem;
+            margin-left: 0.4rem;
+        }
+
         /* ======================== BOARDING PLANNER IFRAME TAB ======================== */
         /* Isolated container for the embedded Boarding Planner — loaded via iframe
            so that CSS/JS from the planner never conflicts with the whiteboard.
@@ -1012,11 +1137,63 @@
         <button class="tab-btn active" data-tab="today" tabindex="1" onclick="switchTab('today')">📅 TODAY</button>
         <button class="tab-btn" data-tab="tomorrow" tabindex="2" onclick="switchTab('tomorrow')">📆 TOMORROW</button>
         <button class="tab-btn" data-tab="boarding-plan" tabindex="3" onclick="switchTab('boarding-plan')">📋 BOARDING PLAN</button>
+        <!-- ADDED: Check-in / Check-out tab — four colour-coded buckets, snapshot-backed (2 Acuity calls/day). -->
+        <button class="tab-btn" data-tab="checkinout" tabindex="4" onclick="switchTab('checkinout')">🔁 CHECK-IN / OUT</button>
         <!-- ADDED: Behaviour-mode toggle. Press B on remote/keyboard, click here, or load with ?mode=behaviour. -->
-        <button class="mode-toggle-btn" id="modeToggleBtn" tabindex="4" onclick="toggleDisplayMode()" title="Toggle behaviour-marker grouping (B)">🐾 Group by Behaviour</button>
+        <button class="mode-toggle-btn" id="modeToggleBtn" tabindex="5" onclick="toggleDisplayMode()" title="Toggle behaviour-marker grouping (B)">🐾 Group by Behaviour</button>
         <span class="behaviour-mode-pill" id="behaviourPill">⚠️ Behaviour mode · auto-off in <span id="behaviourCountdown">2h 0m</span></span>
         <span class="tab-hint">◀ ▶ Use remote arrows to switch</span>
     </nav>
+
+    <!-- ============ CHECK-IN / CHECK-OUT BOARD (4 colour-coded quadrants) ============
+         ADDED: Shown when state.tab === 'checkinout'. Each quadrant uses the standard
+         .board-section / .section-hdr / .cards-area structure so the dynamic content
+         scaling (--content-scale) and existing card visual language carry over.
+         Snapshot data comes from the Boarding Planner Apps Script (mode=checkinout)
+         and is polled at most every CHECKINOUT_POLL_INTERVAL_MS — Acuity itself is
+         only ever called twice per day by the script's scheduled triggers. -->
+    <main class="checkinout-board" id="checkInOutBoard">
+        <div class="board-section cio-section">
+            <div class="section-hdr cio-in-today">
+                <span class="s-label">✅ Check-in Today</span>
+                <span>
+                    <span class="cio-refreshed" id="cio-refreshed-in-today">—</span>
+                    <span class="s-count" id="count-cio-in-today">0 dogs</span>
+                </span>
+            </div>
+            <div class="cards-area cio-in-today" id="cards-cio-in-today"></div>
+        </div>
+        <div class="board-section cio-section">
+            <div class="section-hdr cio-out-today">
+                <span class="s-label">🚪 Check-out Today</span>
+                <span>
+                    <span class="cio-refreshed" id="cio-refreshed-out-today">—</span>
+                    <span class="s-count" id="count-cio-out-today">0 dogs</span>
+                </span>
+            </div>
+            <div class="cards-area cio-out-today" id="cards-cio-out-today"></div>
+        </div>
+        <div class="board-section cio-section">
+            <div class="section-hdr cio-in-tomorrow">
+                <span class="s-label">📥 Check-in Tomorrow</span>
+                <span>
+                    <span class="cio-refreshed" id="cio-refreshed-in-tomorrow">—</span>
+                    <span class="s-count" id="count-cio-in-tomorrow">0 dogs</span>
+                </span>
+            </div>
+            <div class="cards-area cio-in-tomorrow" id="cards-cio-in-tomorrow"></div>
+        </div>
+        <div class="board-section cio-section">
+            <div class="section-hdr cio-out-tomorrow">
+                <span class="s-label">📤 Check-out Tomorrow</span>
+                <span>
+                    <span class="cio-refreshed" id="cio-refreshed-out-tomorrow">—</span>
+                    <span class="s-count" id="count-cio-out-tomorrow">0 dogs</span>
+                </span>
+            </div>
+            <div class="cards-area cio-out-tomorrow" id="cards-cio-out-tomorrow"></div>
+        </div>
+    </main>
 
     <!-- ============ REFRESH PROGRESS ============ -->
     <div class="refresh-track">
@@ -1166,6 +1343,20 @@
             // Change this to the hosted URL of your Boarding Planner (index.html)
             BOARDING_PLANNER_URL: 'https://fairytails123.github.io/Boardingplan/',
 
+            // ADDED: Apps Script web app URL for the Check-in/Check-out tab.
+            // This is the Boarding Planner's backend (supersetplanner-feed.gs).
+            // Hits ?mode=checkinout which returns the pre-computed snapshot
+            // from PropertiesService — zero Acuity calls per request.
+            // Token must match API_TOKEN in supersetplanner-feed.gs.
+            CHECKINOUT_API_URL: 'https://script.google.com/macros/s/AKfycbz2kc3lJbrGk7lw9jVcZMdUrPWjRx4qBARM8YVAIARhYAlQwCzlhHBbKswyOcVHytmB7Q/exec',
+            CHECKINOUT_API_TOKEN: 'ft-k9-board-2024-sec',
+
+            // How often the TV polls the Apps Script snapshot for this tab.
+            // Acuity itself is unaffected — the snapshot only refreshes at 07:00
+            // and 19:00 Europe/London via scheduled triggers. Polling here just
+            // ensures the TV picks up those refreshes without a manual reload.
+            CHECKINOUT_POLL_INTERVAL_MS: 30 * 60 * 1000,  // 30 minutes
+
             // 97 seconds — offset from edit board's 93s inbound & 94s outbound
             REFRESH_INTERVAL: 97000,
 
@@ -1215,6 +1406,14 @@
             error: false,
             firstLoad: true,
             boardingPlannerLoaded: false,  // ADDED: Tracks whether the iframe has been injected
+            // ADDED: Check-in/Check-out tab state
+            checkInOut: {
+                data: null,           // Last successful snapshot
+                lastFetched: 0,       // Epoch ms of last successful fetch
+                inFlight: false,      // Prevents overlapping fetches
+                pollTimer: null,      // setInterval id when tab is active
+                error: null           // Last fetch error, if any
+            },
             displayMode: initialDisplayMode,  // ADDED: 'default' | 'behaviour' (render-only flag)
             behaviourModeTimer: null,         // ADDED: setTimeout id for auto-revert
             behaviourModeStartedAt: null,     // ADDED: epoch-ms; for countdown pill
@@ -2083,16 +2282,28 @@
                 b.classList.toggle('active', b.dataset.tab === tab)
             );
 
-            // ADDED: Toggle visibility between main board and Boarding Planner iframe
+            // ADDED: Toggle visibility between main board, Boarding Planner iframe,
+            // and the Check-in/Check-out board.
             const mainBoard = document.getElementById('tvBoard');
             const bpContainer = document.getElementById('boardingPlannerContainer');
-            // ADDED: Behaviour-mode board must also be hidden on boarding-plan tab.
+            // ADDED: Behaviour-mode board must also be hidden on non-default tabs.
             const behaviourBoard = document.getElementById('tvBoardBehaviour');
+            // ADDED: Check-in/Check-out board container.
+            const cioBoard = document.getElementById('checkInOutBoard');
+
+            // Default: hide everything else
+            mainBoard.style.display = 'none';
+            if (behaviourBoard) behaviourBoard.style.display = 'none';
+            bpContainer.classList.remove('active');
+            if (cioBoard) cioBoard.classList.remove('active');
+
+            // Always stop polling Check-in/Out unless we're on that tab — it'll
+            // be restarted below if we are. Belt-and-braces to prevent stray
+            // intervals leaking between tab switches.
+            stopCheckInOutPolling();
 
             if (tab === 'boarding-plan') {
-                // Hide main board, show Boarding Planner
-                mainBoard.style.display = 'none';
-                if (behaviourBoard) behaviourBoard.style.display = 'none';
+                // Show Boarding Planner iframe
                 bpContainer.classList.add('active');
 
                 // Lazy-load the iframe on first activation
@@ -2104,21 +2315,182 @@
                     bpContainer.appendChild(iframe);
                     state.boardingPlannerLoaded = true;
                 }
+            } else if (tab === 'checkinout') {
+                // Show Check-in/Check-out board
+                if (cioBoard) cioBoard.classList.add('active');
+
+                // Fetch snapshot now (uses cached data if recently fetched),
+                // then poll periodically so the 07:00/19:00 snapshot refreshes
+                // are picked up without a manual reload.
+                loadCheckInOutData();
+                startCheckInOutPolling();
             } else {
-                // Show main board, hide Boarding Planner. render() will pick the
-                // correct board (default vs behaviour) based on state.displayMode.
+                // Show main board. render() will pick the correct board
+                // (default vs behaviour) based on state.displayMode.
                 mainBoard.style.display = '';
-                bpContainer.classList.remove('active');
                 render();
             }
         }
 
         // ================================================================
+        //  ADDED: CHECK-IN / CHECK-OUT TAB — fetch, render, poll
+        //
+        //  The Apps Script endpoint returns a snapshot from PropertiesService
+        //  on every request — Acuity itself is only touched twice per day by
+        //  the script's scheduled triggers. Polling here is purely so the TV
+        //  picks up those refreshes without a manual reload.
+        // ================================================================
+
+        /**
+         * Fetch the check-in/out snapshot from the Apps Script web app.
+         * Skips the fetch if a successful one is younger than the poll interval
+         * (avoids hitting Apps Script needlessly on rapid tab toggling).
+         *
+         * @param {boolean} [force] - If true, bypass the freshness check
+         */
+        function loadCheckInOutData(force) {
+            const cio = state.checkInOut;
+            const now = Date.now();
+
+            if (cio.inFlight) return;
+            if (!force && cio.data && (now - cio.lastFetched) < CONFIG.CHECKINOUT_POLL_INTERVAL_MS) {
+                // Snapshot is still fresh — re-render from cached data and exit
+                renderCheckInOut(cio.data);
+                return;
+            }
+
+            cio.inFlight = true;
+
+            const url = CONFIG.CHECKINOUT_API_URL +
+                '?mode=checkinout&token=' + encodeURIComponent(CONFIG.CHECKINOUT_API_TOKEN);
+
+            fetch(url, { method: 'GET', redirect: 'follow' })
+                .then(resp => {
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                    return resp.json();
+                })
+                .then(data => {
+                    if (data && data.error) throw new Error(data.error);
+                    cio.data = data;
+                    cio.lastFetched = Date.now();
+                    cio.error = null;
+                    renderCheckInOut(data);
+                })
+                .catch(err => {
+                    console.error('[checkinout] fetch failed:', err);
+                    cio.error = err.message || String(err);
+                    // If we have stale data, keep showing it; otherwise show empty + error
+                    renderCheckInOut(cio.data || null);
+                })
+                .finally(() => {
+                    cio.inFlight = false;
+                });
+        }
+
+        /**
+         * Start the periodic polling timer while the tab is active.
+         * Stopped automatically when switching away from the tab.
+         */
+        function startCheckInOutPolling() {
+            stopCheckInOutPolling();
+            state.checkInOut.pollTimer = setInterval(() => {
+                loadCheckInOutData(true);
+            }, CONFIG.CHECKINOUT_POLL_INTERVAL_MS);
+        }
+
+        function stopCheckInOutPolling() {
+            if (state.checkInOut.pollTimer) {
+                clearInterval(state.checkInOut.pollTimer);
+                state.checkInOut.pollTimer = null;
+            }
+        }
+
+        /**
+         * Format an ISO timestamp as a compact "HH:MMam, D Mon" string for the
+         * "last refreshed" stamp shown in each section header.
+         */
+        function formatRefreshedAt(isoStr) {
+            if (!isoStr) return '—';
+            try {
+                const d = new Date(isoStr);
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                let h = d.getHours();
+                const m = ('0' + d.getMinutes()).slice(-2);
+                const ampm = h >= 12 ? 'pm' : 'am';
+                h = h % 12 || 12;
+                return h + ':' + m + ampm + ', ' + d.getDate() + ' ' + months[d.getMonth()];
+            } catch (e) {
+                return '—';
+            }
+        }
+
+        /**
+         * Build the inner HTML for a single check-in/out bucket.
+         * @param {Array} stays - Array of stay objects with dogName + type
+         * @param {string} emptyLabel - Text to show when the bucket is empty
+         */
+        function buildCheckInOutCards(stays, emptyLabel) {
+            if (!stays || !stays.length) {
+                return '<div class="cio-empty">' + escapeHtml(emptyLabel) + '</div>';
+            }
+            const html = [];
+            for (let i = 0; i < stays.length; i++) {
+                const s = stays[i];
+                const type = (s.type === 'school') ? 'school' : 'boarding';
+                const label = (type === 'school') ? 'School' : 'Holiday';
+                html.push(
+                    '<div class="cio-card">' +
+                      '<span class="cio-name">' + escapeHtml(s.dogName || '') + '</span>' +
+                      '<span class="cio-badge ' + type + '">' + label + '</span>' +
+                    '</div>'
+                );
+            }
+            return html.join('');
+        }
+
+        /**
+         * Render the four buckets into the DOM. Safe to call with null when
+         * the snapshot hasn't loaded yet — shows empty states everywhere.
+         */
+        function renderCheckInOut(snapshot) {
+            const buckets = [
+                { key: 'checkInToday',     cardsEl: 'cards-cio-in-today',     countEl: 'count-cio-in-today',     stampEl: 'cio-refreshed-in-today',     empty: 'No check-ins today' },
+                { key: 'checkOutToday',    cardsEl: 'cards-cio-out-today',    countEl: 'count-cio-out-today',    stampEl: 'cio-refreshed-out-today',    empty: 'No check-outs today' },
+                { key: 'checkInTomorrow',  cardsEl: 'cards-cio-in-tomorrow',  countEl: 'count-cio-in-tomorrow',  stampEl: 'cio-refreshed-in-tomorrow',  empty: 'No check-ins tomorrow' },
+                { key: 'checkOutTomorrow', cardsEl: 'cards-cio-out-tomorrow', countEl: 'count-cio-out-tomorrow', stampEl: 'cio-refreshed-out-tomorrow', empty: 'No check-outs tomorrow' }
+            ];
+
+            const refreshedAt = snapshot && (snapshot.snapshotRefreshedAt || snapshot.lastUpdated);
+            const stamp = formatRefreshedAt(refreshedAt);
+
+            for (let i = 0; i < buckets.length; i++) {
+                const b = buckets[i];
+                const stays = (snapshot && snapshot[b.key]) ? snapshot[b.key] : [];
+                const cardsEl = document.getElementById(b.cardsEl);
+                const countEl = document.getElementById(b.countEl);
+                const stampElNode = document.getElementById(b.stampEl);
+
+                if (cardsEl) cardsEl.innerHTML = buildCheckInOutCards(stays, b.empty);
+                if (countEl) countEl.textContent = stays.length + ' dog' + (stays.length === 1 ? '' : 's');
+                if (stampElNode) stampElNode.textContent = stamp;
+            }
+        }
+
+        /**
+         * HTML-escape a string for safe insertion via innerHTML.
+         */
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(str == null ? '' : String(str)));
+            return div.innerHTML;
+        }
+
+        // ================================================================
         //  KEYBOARD / TV REMOTE NAVIGATION
         // ================================================================
-        // MODIFIED: Cycles through all tabs (today → tomorrow → boarding-plan → today…)
-        // Preserves original ArrowLeft/ArrowRight behaviour, extended for 3 tabs
-        const TAB_ORDER = ['today', 'tomorrow', 'boarding-plan'];
+        // MODIFIED: Cycles through all tabs (today → tomorrow → boarding-plan → checkinout → today…)
+        // Preserves original ArrowLeft/ArrowRight behaviour, extended for 4 tabs.
+        const TAB_ORDER = ['today', 'tomorrow', 'boarding-plan', 'checkinout'];
         document.addEventListener('keydown', e => {
             if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
                 e.preventDefault();
