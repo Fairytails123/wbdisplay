@@ -773,6 +773,21 @@
             overflow-wrap: break-word;
         }
 
+        /* ADDED: "Going home tomorrow" prompt — replaces the boarding date row
+           for a dog whose stay ends tonight (i.e. not booked tomorrow). */
+        .card-gohome {
+            padding: calc(0.16rem * var(--content-scale)) calc(0.4rem * var(--content-scale)) calc(0.22rem * var(--content-scale)) calc(0.55rem * var(--content-scale));
+            border-top: 1px dashed var(--border);
+            border-left: calc(0.22rem * var(--content-scale)) solid #d97706;
+            background: #fef3c7;
+            color: #92400e;
+            font-size: calc(0.56rem * var(--content-scale));
+            font-weight: 700;
+            line-height: 1.3;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
         /* Card dates — separate Check In / Check Out containers */
         .card-dates {
             display: flex;
@@ -1603,6 +1618,10 @@
             const tabData = state.data?.[state.tab];
             if (!tabData) return;
 
+            // ADDED: rebuild the "booked tomorrow" index from the same payload
+            // (no extra API call) so boarding cards can flag dogs going home.
+            rebuildTomorrowBookingIndex();
+
             // ADDED: Mode-aware board visibility. Toggle inline display so the
             // boarding-plan tab logic in switchTab() (which sets tvBoard.style.display
             // = 'none') keeps working unchanged. body.mode-behaviour drives the
@@ -1932,9 +1951,10 @@
                 if (d.name && d.name.length > 20) {
                     cardH += 14 * scale;
                 }
-                // Date row adds height (Boarding check-in/out or Boarding School dates)
-                if (d.checkIn || d.checkOut) {
-                    cardH += 22 * scale;
+                // MODIFIED: the going-home prompt (which replaced the date row)
+                // adds height; it wraps to ~2 lines on a narrow card.
+                if (isGoingHomeTomorrow(d)) {
+                    cardH += 40 * scale;
                 }
                 if (d.notes) {
                     const lines = Math.ceil(d.notes.length / 55) || 1;
@@ -1983,9 +2003,10 @@
                 if (d.name && d.name.length > 20) {
                     h += 14 * scale;
                 }
-                // Date row adds height (Boarding check-in/out or Boarding School dates)
-                if (d.checkIn || d.checkOut) {
-                    h += 22 * scale;
+                // MODIFIED: the going-home prompt (which replaced the date row)
+                // adds height; it wraps to ~2 lines on a narrow card.
+                if (isGoingHomeTomorrow(d)) {
+                    h += 40 * scale;
                 }
                 if (d.notes) {
                     const lines = Math.ceil(d.notes.length / 55) || 1;
@@ -2135,6 +2156,56 @@
                    `</label>`;
         }
 
+        // ================================================================
+        //  ADDED: "GOING HOME TOMORROW" PROMPT (Today tab, boarding dogs)
+        //  The boarding check-in/out date row was removed from cards (the
+        //  sheet's checkOut is unreliable — usually empty). Instead, a boarding
+        //  dog whose stay ends tonight will NOT appear in tomorrow's bookings.
+        //  We detect that by cross-referencing the Tomorrow data that already
+        //  rides in the same ?action=load payload — NO extra API call, and it
+        //  refreshes once per board load. Match key is the normalised dog name:
+        //  the only identifier stable across days (each night is a separate
+        //  Acuity appointment with its own id, and checkIn is always the board
+        //  date, so neither can link a stay across days).
+        // ================================================================
+        let tomorrowBookingNames = null;   // Set<string> | null  (null = tomorrow unknown)
+
+        function normDogName(name) {
+            return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        }
+
+        function rebuildTomorrowBookingIndex() {
+            const tom = state.data && state.data.tomorrow && state.data.tomorrow.dogs;
+            // If tomorrow isn't loaded/populated yet we cannot tell who is leaving,
+            // so signal "unknown" and show no prompt rather than flagging everyone.
+            if (!Array.isArray(tom) || tom.length === 0) {
+                tomorrowBookingNames = null;
+                return;
+            }
+            tomorrowBookingNames = new Set(tom.map(d => normDogName(d.name)));
+        }
+
+        function isBoardingDog(dog) {
+            return /Boarding/i.test(String(dog && dog.serviceType));
+        }
+
+        // True only for a boarding dog on the Today tab whose booking does NOT
+        // continue tomorrow (absent from tomorrow's bookings) → going home.
+        function isGoingHomeTomorrow(dog) {
+            if (state.tab !== 'today') return false;   // prompt is today-relative
+            if (!isBoardingDog(dog)) return false;     // boarding dogs only
+            if (!tomorrowBookingNames) return false;   // tomorrow unknown → stay silent
+            return !tomorrowBookingNames.has(normDogName(dog.name));
+        }
+
+        const GOING_HOME_MSG = 'Dog going home tomorrow — check dog food, medicine, and transport.';
+
+        function goingHomeHTML(dog) {
+            return isGoingHomeTomorrow(dog)
+                ? `<div class="card-gohome">🏠 ${esc(GOING_HOME_MSG)}</div>`
+                : '';
+        }
+
         // ---- Card HTML ----
         function renderCard(dog, type) {
             const isBoarding = type === 'bd';
@@ -2174,9 +2245,9 @@
                 ? `<span class="badge badge-behaviour" title="Behaviour ${esc(dog.behaviour)}">B${esc(dog.behaviour)}</span>`
                 : '';
 
-            // Check In / Check Out dates (boarding only)
-            const checkInBadge = isBoarding ? dateBadgeHTML(dog.checkIn, 'in') : '';
-            const checkOutBadge = isBoarding ? dateBadgeHTML(dog.checkOut, 'out') : '';
+            // MODIFIED: Boarding check-in/out dates removed (sheet checkOut is
+            // unreliable). A boarding dog not booked tomorrow gets a going-home prompt.
+            const goHomeHTML = goingHomeHTML(dog);
 
             const cardClass = type === 'fd' ? 'fd-card' : type === 'hd' ? 'hd-card' : 'bd-card';
 
@@ -2198,10 +2269,7 @@
                 }
             }
 
-            // Date badges row for boarding
-            const datesHTML = (checkInBadge || checkOutBadge)
-                ? `<div class="card-dates">${checkInBadge}${checkOutBadge}</div>`
-                : '';
+            // (Boarding date row removed — replaced by goHomeHTML, computed above.)
 
             // ADDED: Report-done feature (Today tab only). Focus attrs + done class
             // are gated on state.tab === 'today' so Tomorrow's HTML is byte-identical.
@@ -2220,7 +2288,7 @@
                     '</div>' +
                     reportToggleHTML(dog) +
                 '</div>' +
-                datesHTML +
+                goHomeHTML +
                 notesHTML +
             '</div>';
         }
@@ -2251,17 +2319,15 @@
 
         // ---- Boarding School Card ----
         function renderBoardingSchoolCard(dog) {
-            const checkInBadge = dateBadgeHTML(dog.checkIn, 'in');
-            const checkOutBadge = dateBadgeHTML(dog.checkOut, 'out');
             const crateBadge = dog.crateSize
                 ? `<span class="badge badge-bs-crate">${esc(dog.crateSize)}</span>` : '';
             const behaviourBadge = dog.behaviour
                 ? `<span class="badge badge-behaviour" title="Behaviour ${esc(dog.behaviour)}">B${esc(dog.behaviour)}</span>`
                 : '';
 
-            const datesHTML = (checkInBadge || checkOutBadge)
-                ? `<div class="card-dates">${checkInBadge}${checkOutBadge}</div>`
-                : '';
+            // MODIFIED: Boarding-school check-in/out dates removed; show the
+            // going-home prompt instead when applicable.
+            const goHomeHTML = goingHomeHTML(dog);
 
             // ADDED: Report-done feature (Today tab only)
             const doneClass = (state.tab === 'today' && isReportDone(dog.name)) ? ' report-done' : '';
@@ -2276,7 +2342,7 @@
                     '</div>' +
                     reportToggleHTML(dog) +
                 '</div>' +
-                datesHTML +
+                goHomeHTML +
             '</div>';
         }
 
