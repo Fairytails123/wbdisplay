@@ -580,6 +580,11 @@
             padding: calc(0.2rem * var(--content-scale)) calc(0.35rem * var(--content-scale));
             gap: calc(0.3rem * var(--content-scale));
             min-height: calc(1.8rem * var(--content-scale));
+            /* MODIFIED: Allow the badge cluster to wrap onto a second line when the
+               card is narrow, instead of crushing the name to zero width. This is
+               what stops dog names shattering one-letter-per-line in narrow sections
+               (e.g. behaviour-mode B2). On wide cards it has no effect. */
+            flex-wrap: wrap;
         }
 
         .card-name {
@@ -591,11 +596,16 @@
                Original was: white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                Preserved as comment for reference. */
             white-space: normal;
-            word-break: break-word;
+            /* MODIFIED: word-break:normal (was break-word) so names break only
+               BETWEEN words, never mid-word into one-letter-per-line. min-width
+               (was 0) guarantees the name keeps a readable width and forces the
+               badge cluster to wrap below it rather than squeezing the name to
+               nothing in a narrow column. */
+            word-break: normal;
             overflow-wrap: break-word;
             line-height: 1.2;
-            flex: 1;
-            min-width: 0;
+            flex: 1 1 auto;
+            min-width: 4.5em;
         }
 
         .card-badges {
@@ -1534,9 +1544,10 @@
         //  conditional on the per-section dog-count-vs-space math. If every
         //  section fits at full size, scale stays 1 (no shrink). The densest
         //  section drives a single global --content-scale so all cards stay
-        //  uniform. Floor is gentler than default mode (0.7 vs 0.55) — "mild".
+        //  uniform. Shrinks aggressively (down to 0.5) when a section is dense so
+        //  every dog stays on-screen and readable; stays at 1 when nothing overflows.
         // ================================================================
-        const BEHAVIOUR_MIN_SCALE = 0.7;
+        const BEHAVIOUR_MIN_SCALE = 0.5;
 
         function dynamicScaleBehaviour() {
             const board = document.getElementById('tvBoardBehaviour');
@@ -1894,15 +1905,24 @@
             });
 
             // ADDED: Width-aware column cap. A dog card needs room for its name
-            // PLUS its badge cluster (AM/PM van, behaviour, crate, checkbox) on one
-            // row. card-name is flex:1; min-width:0, so when a section is narrow
-            // (e.g. the 25%-width B2 column in behaviour mode) packing dogs into
-            // multiple columns squeezes the name to a sliver and word-break wraps
-            // it one character per line ("B-e-l-l"). Cap the column count so every
-            // column stays at least MIN_CARD_WIDTH wide. Expressed in rem (× content
-            // scale) so it tracks the rendered text size across TV resolutions.
-            const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-            const MIN_CARD_WIDTH = rootPx * 7 * scale;
+            // PLUS its badge cluster (AM/PM van, behaviour, crate, checkbox). When a
+            // section is narrow, packing dogs into multiple columns leaves each card
+            // too thin and names shatter one-letter-per-line ("B-e-l-l").
+            //
+            // The minimum card width is expressed as a fraction of the VIEWPORT
+            // width (not absolute px) so it is resolution-independent — it behaves
+            // identically whether the TV reports a 1080px or 2160px logical width.
+            // Behaviour mode is deliberately aggressive: 30% of viewport per card
+            // forces the narrow 25%-wide sections (B2, B4/B5, No-marker) to a single
+            // column, while the wide 75% B1 still gets ~2 columns. Default mode keeps
+            // a gentler ~7rem floor so the dense van-grouped board is unaffected.
+            let MIN_CARD_WIDTH;
+            if (state.displayMode === 'behaviour') {
+                MIN_CARD_WIDTH = window.innerWidth * 0.30;
+            } else {
+                const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+                MIN_CARD_WIDTH = rootPx * 7 * scale;
+            }
             const maxColsByWidth = Math.max(1, Math.floor(w / MIN_CARD_WIDTH));
 
             const needed = Math.ceil(totalH / Math.max(h, 200));
