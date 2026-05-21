@@ -520,6 +520,15 @@
             transition: background 0.3s ease;
         }
 
+        /* ADDED: In behaviour mode the cards sit in fixed-height flex columns
+           (.cards-col flex:1). Without this, .dog-card defaults to flex-shrink:1
+           and (combined with overflow:hidden) the cards silently squash + clip
+           themselves to fit instead of overflowing — which both looks crushed AND
+           hides the overflow from dynamicScaleBehaviour() so the font never shrinks.
+           Pinning flex-shrink:0 makes the overflow real and measurable. Scoped to
+           the behaviour board so default mode is unchanged. */
+        .tv-board-behaviour .dog-card { flex-shrink: 0; }
+
         .dog-card.fd-card { border-left: 4px solid var(--fd-accent); background: var(--fd-bg); }
         .dog-card.hd-card { border-left: 4px solid var(--hd-accent); background: var(--hd-bg); }
         .dog-card.bd-card { border-left: 4px solid var(--bd-accent); background: var(--bd-bg); }
@@ -1559,22 +1568,30 @@
 
             // For each visible section, ratio = available height / natural content
             // height. <1 means the dogs overflow and need shrinking. The smallest
-            // ratio across all sections is the binding constraint.
+            // ratio across all sections is the binding constraint. Content height is
+            // the TALLEST column (.cards-col) inside the section — robust regardless
+            // of how flex overflow propagates to the section's scrollHeight, now that
+            // cards no longer shrink (.tv-board-behaviour .dog-card flex-shrink:0).
             const sectionIds = ['b1', 'b2', 'b3', 'b45', 'bnone'];
             let minRatio = 1;
             sectionIds.forEach(id => {
                 const area = document.getElementById('cards-' + id);
                 if (!area) return;
                 const avail = area.clientHeight;
-                const content = area.scrollHeight;
+                let content = area.scrollHeight;
+                area.querySelectorAll('.cards-col').forEach(col => {
+                    if (col.scrollHeight > content) content = col.scrollHeight;
+                });
                 if (avail <= 0 || content <= 0) return;
                 const ratio = avail / content;
                 if (ratio < minRatio) minRatio = ratio;
             });
 
-            // Never grow past 1 (cards are already natural size); only shrink,
-            // and never below the mild floor.
-            let scale = Math.max(BEHAVIOUR_MIN_SCALE, Math.min(1, minRatio));
+            // Never grow past 1 (cards are already natural size); only shrink when a
+            // section overflows, with a small safety margin so nothing clips by a
+            // pixel, and never below the floor.
+            let scale = Math.min(1, minRatio);
+            if (scale < 1) scale = Math.max(BEHAVIOUR_MIN_SCALE, scale * 0.97);
             scale = Math.round(scale * 100) / 100;
 
             document.documentElement.style.setProperty('--content-scale', scale.toString());
@@ -1758,6 +1775,11 @@
             const nameSort = (a, b) => (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' });
             Object.values(groups).forEach(group => group.sort(nameSort));
 
+            // ADDED: Size the top row before rendering so calcColumns measures the
+            // correct section widths. A dense B2 borrows width from B1 (→ 50/50) so
+            // both can use two readable columns instead of B2 cramming at 25%.
+            adjustBehaviourLayout(groups['1'].length, groups['2'].length);
+
             // Pass getCardTypeForDog so each card derives its type from the dog's
             // serviceType — keeps Grooming + Boarding-School cards rendering via
             // their specialised layouts, and preserves the standard fd/hd/bd
@@ -1771,6 +1793,23 @@
             renderSection('b3',    groups['3'],                          getCardTypeForDog);
             renderSection('b45',   [...groups['4'], ...groups['5']],     getCardTypeForDog);
             renderSection('bnone', groups['none'],                       getCardTypeForDog);
+        }
+
+        // ================================================================
+        //  ADDED: DYNAMIC BEHAVIOUR-BOARD TOP-ROW WIDTH
+        //  The behaviour grid's top row holds B1 (left) and B2 (right). By
+        //  default B1 takes 75% and B2 25%, which crams a dense B2. When B2 is
+        //  busy we rebalance to 50/50 so B2 can use two readable columns. The
+        //  bottom row (b3 50% / b45 25% / bnone 25%) is unchanged. Each named
+        //  area stays rectangular, so the grid-template-areas strings are valid.
+        // ================================================================
+        function adjustBehaviourLayout(b1Count, b2Count) {
+            const board = document.getElementById('tvBoardBehaviour');
+            if (!board) return;
+            const topRow = (b2Count >= 12)
+                ? '"b1 b1 b1 b1 b2 b2 b2 b2"'   // dense B2 → 50% / 50%
+                : '"b1 b1 b1 b1 b1 b1 b2 b2"';  // default  → 75% / 25%
+            board.style.gridTemplateAreas = topRow + ' "b3 b3 b3 b3 b45 b45 bnone bnone"';
         }
 
         // ================================================================
@@ -1912,13 +1951,16 @@
             // The minimum card width is expressed as a fraction of the VIEWPORT
             // width (not absolute px) so it is resolution-independent — it behaves
             // identically whether the TV reports a 1080px or 2160px logical width.
-            // Behaviour mode is deliberately aggressive: 30% of viewport per card
-            // forces the narrow 25%-wide sections (B2, B4/B5, No-marker) to a single
-            // column, while the wide 75% B1 still gets ~2 columns. Default mode keeps
-            // a gentler ~7rem floor so the dense van-grouped board is unaffected.
+            // Behaviour mode: 20% of viewport per card. With the dynamic top-row
+            // split (adjustBehaviourLayout) a dense B2 gets 50% width → 2 columns,
+            // while a sparse B2 keeps 25% width → 1 column; the wide B1 gets 2–3
+            // columns depending on the split. 0.20 × viewport still comfortably fits
+            // a name + badge cluster and, being viewport-relative, is correct at any
+            // logical resolution. Default mode keeps a gentler ~7rem floor so the
+            // dense van-grouped board is unaffected.
             let MIN_CARD_WIDTH;
             if (state.displayMode === 'behaviour') {
-                MIN_CARD_WIDTH = window.innerWidth * 0.30;
+                MIN_CARD_WIDTH = window.innerWidth * 0.20;
             } else {
                 const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
                 MIN_CARD_WIDTH = rootPx * 7 * scale;
