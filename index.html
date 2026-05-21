@@ -1526,6 +1526,50 @@
             }
         }
 
+        // ================================================================
+        //  ADDED: BEHAVIOUR-MODE CONTENT SCALING (mild, conditional)
+        //  The behaviour board is a fixed 3fr/1fr grid, so dynamicScale's
+        //  left/right-column logic doesn't apply. Instead we shrink ONLY when
+        //  a section's dogs overflow its allotted height — i.e. the shrink is
+        //  conditional on the per-section dog-count-vs-space math. If every
+        //  section fits at full size, scale stays 1 (no shrink). The densest
+        //  section drives a single global --content-scale so all cards stay
+        //  uniform. Floor is gentler than default mode (0.7 vs 0.55) — "mild".
+        // ================================================================
+        const BEHAVIOUR_MIN_SCALE = 0.7;
+
+        function dynamicScaleBehaviour() {
+            const board = document.getElementById('tvBoardBehaviour');
+            if (!board || board.style.display === 'none') return;
+
+            // Measure each section at natural (unscaled) size first.
+            document.documentElement.style.setProperty('--content-scale', '1');
+            void board.offsetHeight; // force reflow before measuring
+
+            // For each visible section, ratio = available height / natural content
+            // height. <1 means the dogs overflow and need shrinking. The smallest
+            // ratio across all sections is the binding constraint.
+            const sectionIds = ['b1', 'b2', 'b3', 'b45', 'bnone'];
+            let minRatio = 1;
+            sectionIds.forEach(id => {
+                const area = document.getElementById('cards-' + id);
+                if (!area) return;
+                const avail = area.clientHeight;
+                const content = area.scrollHeight;
+                if (avail <= 0 || content <= 0) return;
+                const ratio = avail / content;
+                if (ratio < minRatio) minRatio = ratio;
+            });
+
+            // Never grow past 1 (cards are already natural size); only shrink,
+            // and never below the mild floor.
+            let scale = Math.max(BEHAVIOUR_MIN_SCALE, Math.min(1, minRatio));
+            scale = Math.round(scale * 100) / 100;
+
+            document.documentElement.style.setProperty('--content-scale', scale.toString());
+            lastScale = scale;
+        }
+
         // ---- Render ----
         function render() {
             const tabData = state.data?.[state.tab];
@@ -1560,11 +1604,13 @@
             // Uses requestAnimationFrame to ensure the DOM has fully laid out before measuring.
             // Skipped in behaviour mode — that board uses a flat grid that doesn't need
             // the right-column proportional sizing dynamicScale was designed for.
-            if (state.displayMode === 'default') {
-                requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                if (state.displayMode === 'behaviour') {
+                    dynamicScaleBehaviour();
+                } else {
                     dynamicScale();
-                });
-            }
+                }
+            });
         }
 
         // ---- Stats ----
@@ -1823,6 +1869,7 @@
         function calcColumns(dogs, container) {
             // Estimate available height (use offsetHeight or fallback)
             const h = container.offsetHeight || 500;
+            const w = container.offsetWidth || 300;
 
             // MODIFIED: Scale-aware per-card height estimation
             // Base card height accounts for name potentially wrapping on longer names
@@ -1846,8 +1893,20 @@
                 totalH += cardH;
             });
 
+            // ADDED: Width-aware column cap. A dog card needs room for its name
+            // PLUS its badge cluster (AM/PM van, behaviour, crate, checkbox) on one
+            // row. card-name is flex:1; min-width:0, so when a section is narrow
+            // (e.g. the 25%-width B2 column in behaviour mode) packing dogs into
+            // multiple columns squeezes the name to a sliver and word-break wraps
+            // it one character per line ("B-e-l-l"). Cap the column count so every
+            // column stays at least MIN_CARD_WIDTH wide. Expressed in rem (× content
+            // scale) so it tracks the rendered text size across TV resolutions.
+            const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+            const MIN_CARD_WIDTH = rootPx * 7 * scale;
+            const maxColsByWidth = Math.max(1, Math.floor(w / MIN_CARD_WIDTH));
+
             const needed = Math.ceil(totalH / Math.max(h, 200));
-            return Math.max(1, Math.min(5, needed));
+            return Math.max(1, Math.min(5, maxColsByWidth, needed));
         }
 
         function distributeColumns(dogs, n) {
@@ -2651,7 +2710,13 @@
 
             // ADDED: Recalculate scale on window resize (e.g. TV orientation change)
             window.addEventListener('resize', () => {
-                requestAnimationFrame(() => dynamicScale());
+                requestAnimationFrame(() => {
+                    if (state.displayMode === 'behaviour') {
+                        dynamicScaleBehaviour();
+                    } else {
+                        dynamicScale();
+                    }
+                });
             });
         }
 
