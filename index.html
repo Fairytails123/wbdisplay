@@ -2558,10 +2558,12 @@
                 })
                 .then(data => {
                     if (data && data.error) throw new Error(data.error);
-                    cio.data = data;
+                    // Accept either the pre-computed snapshot or the raw boarding
+                    // feed; normalizeCheckInOutData() buckets the latter client-side.
+                    cio.data = normalizeCheckInOutData(data);
                     cio.lastFetched = Date.now();
                     cio.error = null;
-                    renderCheckInOut(data);
+                    renderCheckInOut(cio.data);
                 })
                 .catch(err => {
                     console.error('[checkinout] fetch failed:', err);
@@ -2633,6 +2635,73 @@
                 );
             }
             return html.join('');
+        }
+
+        /**
+         * Local 'YYYY-MM-DD' for a Date, using local (kennel = Europe/London)
+         * calendar components — NOT toISOString(), which is UTC and would shift
+         * the date side of midnight.
+         */
+        function localDateStr(d) {
+            return d.getFullYear() + '-' +
+                ('0' + (d.getMonth() + 1)).slice(-2) + '-' +
+                ('0' + d.getDate()).slice(-2);
+        }
+
+        /**
+         * Normalise the ?mode=checkinout response into the four-bucket shape the
+         * renderer expects.
+         *
+         * The Apps Script backend is *meant* to return pre-computed buckets
+         * (checkInToday/checkOutToday/checkInTomorrow/checkOutTomorrow). If the
+         * deployed backend predates that feature it falls through to the boarding
+         * feed and returns { stays:[...] } instead — in which case we derive the
+         * buckets here from the raw stays. Logic mirrors buildCheckInOutBuckets_()
+         * in supersetplanner-feed.gs: checkIn = arrival day, checkOut = the day the
+         * dog leaves (day after the final booked night).
+         */
+        function normalizeCheckInOutData(data) {
+            if (!data) return null;
+
+            // Backend already bucketed it — use as-is.
+            if (Array.isArray(data.checkInToday) || Array.isArray(data.checkOutToday) ||
+                Array.isArray(data.checkInTomorrow) || Array.isArray(data.checkOutTomorrow)) {
+                return data;
+            }
+
+            // Fallback: derive buckets client-side from the boarding feed.
+            const stays = Array.isArray(data.stays) ? data.stays : [];
+            const now = new Date();
+            const today = localDateStr(now);
+            const tmrwDate = new Date(now.getTime());
+            tmrwDate.setDate(tmrwDate.getDate() + 1);
+            const tomorrow = localDateStr(tmrwDate);
+
+            const checkInToday = [], checkOutToday = [], checkInTomorrow = [], checkOutTomorrow = [];
+            for (let i = 0; i < stays.length; i++) {
+                const s = stays[i];
+                if (s.checkIn === today) checkInToday.push(s);
+                if (s.checkOut === today) checkOutToday.push(s);
+                if (s.checkIn === tomorrow) checkInTomorrow.push(s);
+                if (s.checkOut === tomorrow) checkOutTomorrow.push(s);
+            }
+            const byName = (a, b) => (a.dogName || '').localeCompare(b.dogName || '');
+            checkInToday.sort(byName);
+            checkOutToday.sort(byName);
+            checkInTomorrow.sort(byName);
+            checkOutTomorrow.sort(byName);
+
+            return {
+                today: today,
+                tomorrow: tomorrow,
+                checkInToday: checkInToday,
+                checkOutToday: checkOutToday,
+                checkInTomorrow: checkInTomorrow,
+                checkOutTomorrow: checkOutTomorrow,
+                snapshotRefreshedAt: data.lastUpdated || new Date().toISOString(),
+                lastUpdated: data.lastUpdated || null,
+                error: data.error || null
+            };
         }
 
         /**
