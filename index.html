@@ -1265,11 +1265,12 @@
         <button class="tab-btn active" data-tab="today" tabindex="1" onclick="switchTab('today')">📅 TODAY</button>
         <button class="tab-btn" data-tab="tomorrow" tabindex="2" onclick="switchTab('tomorrow')">📆 TOMORROW</button>
         <button class="tab-btn" data-tab="boarding-plan" tabindex="3" onclick="switchTab('boarding-plan')">📋 BOARDING PLAN</button>
-        <!-- ADDED: Van Assignment tab — full dog roster with an editable BV/SV/DV dropdown per dog,
-             persisted to the roster sheet via van_assignment_api.gs. The only writing tab. -->
-        <button class="tab-btn" data-tab="van-assignment" tabindex="4" onclick="switchTab('van-assignment')">🚐 VAN ASSIGNMENT</button>
         <!-- ADDED: Check-in / Check-out tab — four colour-coded buckets, snapshot-backed (2 Acuity calls/day). -->
-        <button class="tab-btn" data-tab="checkinout" tabindex="5" onclick="switchTab('checkinout')">🔁 CHECK-IN / OUT</button>
+        <button class="tab-btn" data-tab="checkinout" tabindex="4" onclick="switchTab('checkinout')">🔁 CHECK-IN / OUT</button>
+        <!-- ADDED: Van Assignment tab — full dog roster with an editable BV/SV/DV dropdown per dog,
+             persisted to the roster sheet via van_assignment_api.gs. The only writing tab.
+             Kept LAST, after Check-in/out. -->
+        <button class="tab-btn" data-tab="van-assignment" tabindex="5" onclick="switchTab('van-assignment')">🚐 VAN ASSIGNMENT</button>
         <!-- ADDED: Behaviour-mode toggle. Press B on remote/keyboard, click here, or load with ?mode=behaviour. -->
         <button class="mode-toggle-btn" id="modeToggleBtn" tabindex="6" onclick="toggleDisplayMode()" title="Toggle behaviour-marker grouping (B)">🐾 Group by Behaviour</button>
         <span class="behaviour-mode-pill" id="behaviourPill">⚠️ Behaviour mode · auto-off in <span id="behaviourCountdown">2h 0m</span></span>
@@ -3152,10 +3153,10 @@
         // ================================================================
         //  KEYBOARD / TV REMOTE NAVIGATION
         // ================================================================
-        // MODIFIED: Cycles through all tabs (today → tomorrow → boarding-plan → van-assignment → checkinout → today…)
+        // MODIFIED: Cycles through all tabs (today → tomorrow → boarding-plan → checkinout → van-assignment → today…)
         // Preserves original ArrowLeft/ArrowRight behaviour, extended for 5 tabs. On the
         // van-assignment tab, ←/→ are repurposed for editing while a row is focused (see above).
-        const TAB_ORDER = ['today', 'tomorrow', 'boarding-plan', 'van-assignment', 'checkinout'];
+        const TAB_ORDER = ['today', 'tomorrow', 'boarding-plan', 'checkinout', 'van-assignment'];
         document.addEventListener('keydown', e => {
             // ADDED: the Van Assignment tab owns the arrow keys for row navigation +
             // van editing. It only consumes ←/→ when a row is focused, so when no row
