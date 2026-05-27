@@ -2661,6 +2661,10 @@
                 // Show the Van Assignment board, load the roster now, then poll so
                 // edits made elsewhere (or directly in the sheet) appear over time.
                 if (vanBoard) vanBoard.classList.add('active');
+                // Auto-focus the first row so ↑/↓ move the list and ←/→ set the van straight away
+                // (no need to "enter" the list first). ↑ at the top / Esc steps back out to tab nav.
+                state.vanAssignment.rowFocused = true;
+                state.vanAssignment.focusIdx = 0;
                 loadVanAssignmentData();
                 startVanAssignmentPolling();
             } else {
@@ -2940,24 +2944,47 @@
         }
 
         /**
+         * Resolve an arrow direction from a keydown event, robust across browsers / TV remotes.
+         * Different webviews report d-pad keys as 'ArrowUp' (modern), 'Up' (legacy), or only via
+         * a numeric keyCode (38/40/37/39). Returns 'up' | 'down' | 'left' | 'right' | null.
+         */
+        function getArrowDir(e) {
+            const k = e.key;
+            if (k === 'ArrowUp' || k === 'Up') return 'up';
+            if (k === 'ArrowDown' || k === 'Down') return 'down';
+            if (k === 'ArrowLeft' || k === 'Left') return 'left';
+            if (k === 'ArrowRight' || k === 'Right') return 'right';
+            switch (e.keyCode || e.which) {
+                case 38: return 'up';
+                case 40: return 'down';
+                case 37: return 'left';
+                case 39: return 'right';
+            }
+            return null;
+        }
+
+        /**
          * Handle the remote/arrow keys while the Van Assignment tab is active.
          * Returns true if the key was consumed (so the global tab-switch handler skips it).
-         *   ↓ enter list / move down   ↑ move up / exit at top
-         *   ←/→ change focused row's van   Esc exit list
+         * A row is auto-focused when the tab opens (see switchTab), so:
+         *   ↑/↓ move through the list   ←/→ change the focused row's van   ↑ at top / Esc exit
          */
         function handleVanAssignmentKey(e) {
             const va = state.vanAssignment;
             const last = va.dogs.length - 1;
             if (last < 0) return false;
 
-            if (e.key === 'ArrowDown') {
+            const dir = getArrowDir(e);
+            const isEsc = (e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27);
+
+            if (dir === 'down') {
                 e.preventDefault();
                 if (!va.rowFocused) { va.rowFocused = true; va.focusIdx = 0; }
                 else if (va.focusIdx < last) { va.focusIdx++; }
                 applyVanFocus();
                 return true;
             }
-            if (e.key === 'ArrowUp') {
+            if (dir === 'up') {
                 if (!va.rowFocused) return false;
                 e.preventDefault();
                 if (va.focusIdx > 0) {
@@ -2970,13 +2997,13 @@
                 applyVanFocus();
                 return true;
             }
-            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            if (dir === 'left' || dir === 'right') {
                 if (!va.rowFocused) return false;   // no row focused → let the tab switch
                 e.preventDefault();
-                cycleFocusedVan(e.key === 'ArrowRight' ? 1 : -1);
+                cycleFocusedVan(dir === 'right' ? 1 : -1);
                 return true;
             }
-            if (e.key === 'Escape') {
+            if (isEsc) {
                 if (!va.rowFocused) return false;
                 e.preventDefault();
                 va.rowFocused = false;
@@ -3164,11 +3191,12 @@
             if (state.tab === 'van-assignment' && handleVanAssignmentKey(e)) {
                 return;
             }
-            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            const navDir = getArrowDir(e);
+            if (navDir === 'left' || navDir === 'right') {
                 e.preventDefault();
                 const currentIdx = TAB_ORDER.indexOf(state.tab);
                 let nextIdx;
-                if (e.key === 'ArrowRight') {
+                if (navDir === 'right') {
                     nextIdx = (currentIdx + 1) % TAB_ORDER.length;
                 } else {
                     nextIdx = (currentIdx - 1 + TAB_ORDER.length) % TAB_ORDER.length;
