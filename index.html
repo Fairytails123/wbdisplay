@@ -1568,7 +1568,8 @@
             boardingPlannerLoaded: false,  // ADDED: Tracks whether the iframe has been injected
             // ADDED: Check-in/Check-out tab state
             checkInOut: {
-                data: null,           // Last successful snapshot
+                data: null,           // Last successful snapshot (normalised buckets)
+                raw: null,            // Last successful RAW payload (stays, if backend sends them)
                 lastFetched: 0,       // Epoch ms of last successful fetch
                 inFlight: false,      // Prevents overlapping fetches
                 pollTimer: null,      // setInterval id when tab is active
@@ -2295,45 +2296,128 @@
         }
 
         // ================================================================
-        //  ADDED: "GOING HOME TOMORROW" PROMPT (Today tab, boarding dogs)
-        //  The boarding check-in/out date row was removed from cards (the
-        //  sheet's checkOut is unreliable — usually empty). Instead, a boarding
-        //  dog whose stay ends tonight will NOT appear in tomorrow's bookings.
-        //  We detect that by cross-referencing the Tomorrow data that already
-        //  rides in the same ?action=load payload — NO extra API call, and it
-        //  refreshes once per board load. Match key is the normalised dog name:
-        //  the only identifier stable across days (each night is a separate
-        //  Acuity appointment with its own id, and checkIn is always the board
-        //  date, so neither can link a stay across days).
+        //  "GOING HOME TOMORROW" PROMPT (Today tab, boarding dogs)
+        //
+        //  REWRITTEN 2026-06-10. The old implementation inferred "going home"
+        //  from the dog's name being ABSENT from the Tomorrow tab. That proxy
+        //  was temperamental:
+        //    • a DAYCARE booking tomorrow suppressed the warning — a boarder
+        //      checking out but booked in for Full Day the next morning never
+        //      flagged (live miss: millie Bowles, 2026-06-10);
+        //    • the Tomorrow tab is empty/stale for much of the day (cleared by
+        //      the morning transfer, repopulated by the 14:05 Acuity pull) —
+        //      in that window no warning could show at all;
+        //    • staff renames on the Today tab broke the name match.
+        //
+        //  The board ALREADY fetches authoritative stay records (real Acuity
+        //  checkIn/checkOut dates, consecutive nights coalesced per stay) from
+        //  the Boarding API for the CHECK-IN/OUT tab. That data is now loaded
+        //  on boot too (see init()) and is the PRIMARY source:
+        //      going home tomorrow ⇔ a stay checks out tomorrow
+        //                             AND no stay checks back in tomorrow
+        //  so back-to-back rebookings don't flag, and a daycare visit
+        //  tomorrow correctly does NOT suppress the warning.
+        //
+        //  Fallback (dog unknown to the Boarding API — name drift or an
+        //  off-book booking): the old Tomorrow-tab heuristic, fixed to only
+        //  count tomorrow's BOARDING-type bookings as "still here".
         // ================================================================
-        let tomorrowBookingNames = null;   // Set<string> | null  (null = tomorrow unknown)
+        let tomorrowBoardingNames = null;  // Set<string> | null (null = tomorrow unknown)
+        let goingHomeIndex = null;         // { known, out, back } name-sets | null
 
         function normDogName(name) {
-            return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            return String(name || '').trim().toLowerCase()
+                .replace(/[‘’]/g, "'")   // fold curly apostrophes (Acuity vs sheet drift)
+                .replace(/\s+/g, ' ');
         }
 
         function rebuildTomorrowBookingIndex() {
+            // Fallback index: tomorrow's BOARDING bookings from the staff sheet.
             const tom = state.data && state.data.tomorrow && state.data.tomorrow.dogs;
-            // If tomorrow isn't loaded/populated yet we cannot tell who is leaving,
-            // so signal "unknown" and show no prompt rather than flagging everyone.
             if (!Array.isArray(tom) || tom.length === 0) {
-                tomorrowBookingNames = null;
-                return;
+                // Tomorrow tab empty/not loaded → unknown; fallback stays silent.
+                tomorrowBoardingNames = null;
+            } else {
+                tomorrowBoardingNames = new Set(
+                    tom.filter(isBoardingDog).map(d => normDogName(d.name))
+                );
             }
-            tomorrowBookingNames = new Set(tom.map(d => normDogName(d.name)));
+
+            // Primary index: authoritative stays from the Boarding API.
+            goingHomeIndex = buildGoingHomeIndex();
+        }
+
+        // Build { known, out, back } name-sets from the boarding stays the
+        // CHECK-IN/OUT tab already fetches. Stay dates are absolute YYYY-MM-DD
+        // strings, so comparing them against the CURRENT client date on every
+        // render is immune to the payload's age and to midnight rollover.
+        function buildGoingHomeIndex() {
+            const now = new Date();
+            const todayStr = localDateStr(now);
+            const tmrw = new Date(now.getTime());
+            tmrw.setDate(tmrw.getDate() + 1);
+            const tomorrowStr = localDateStr(tmrw);
+
+            const raw = state.checkInOut.raw;
+            let stays = (raw && Array.isArray(raw.stays)) ? raw.stays : null;
+            let partial = false;
+
+            if (!stays) {
+                // Pre-bucketed snapshot shape (no raw stays). Its buckets were
+                // computed for the SERVER's today/tomorrow — only trust them
+                // when they line up with the client's dates. The buckets only
+                // list boundary-day stays (mid-stay dogs appear in none), so
+                // the index built from them is PARTIAL: a dog absent from it
+                // is most likely mid-stay, not off-book.
+                const b = state.checkInOut.data;
+                if (b && b.tomorrow === tomorrowStr &&
+                    (Array.isArray(b.checkOutTomorrow) || Array.isArray(b.checkInTomorrow))) {
+                    stays = [].concat(b.checkInToday || [], b.checkOutToday || [],
+                                      b.checkInTomorrow || [], b.checkOutTomorrow || []);
+                    partial = true;
+                }
+            }
+            if (!stays) return null;
+
+            const known = new Set(), out = new Set(), back = new Set();
+            for (let i = 0; i < stays.length; i++) {
+                const s = stays[i];
+                const n = normDogName(s.dogName);
+                // Only a stay overlapping today/tomorrow makes a dog "known" —
+                // a future-only booking says nothing about the current stay.
+                if (s.checkIn <= tomorrowStr && s.checkOut >= todayStr) known.add(n);
+                if (s.checkOut === tomorrowStr) out.add(n);
+                if (s.checkIn === tomorrowStr) back.add(n);
+            }
+            return { known: known, out: out, back: back, partial: partial };
         }
 
         function isBoardingDog(dog) {
             return /Boarding/i.test(String(dog && dog.serviceType));
         }
 
-        // True only for a boarding dog on the Today tab whose booking does NOT
-        // continue tomorrow (absent from tomorrow's bookings) → going home.
+        // True only for a boarding dog on the Today tab that is going home
+        // tomorrow: its stay checks out tomorrow and it is NOT booked back
+        // into boarding the same day.
         function isGoingHomeTomorrow(dog) {
             if (state.tab !== 'today') return false;   // prompt is today-relative
             if (!isBoardingDog(dog)) return false;     // boarding dogs only
-            if (!tomorrowBookingNames) return false;   // tomorrow unknown → stay silent
-            return !tomorrowBookingNames.has(normDogName(dog.name));
+            const n = normDogName(dog.name);
+
+            // Primary: real checkout dates from the Boarding API.
+            if (goingHomeIndex) {
+                if (goingHomeIndex.known.has(n)) {
+                    return goingHomeIndex.out.has(n) && !goingHomeIndex.back.has(n);
+                }
+                // A partial (bucket-shape) index can't vouch for mid-stay dogs —
+                // stay silent rather than risk a false alarm from the heuristic.
+                if (goingHomeIndex.partial) return false;
+            }
+
+            // Fallback: absent from tomorrow's BOARDING bookings → going home.
+            // (Daycare bookings tomorrow must NOT suppress the warning.)
+            if (!tomorrowBoardingNames) return false;  // tomorrow unknown → stay silent
+            return !tomorrowBoardingNames.has(n);
         }
 
         const GOING_HOME_MSG = 'Dog going home tomorrow — check dog food, medicine, and transport.';
@@ -2652,11 +2736,11 @@
                 // Show Check-in/Check-out board
                 if (cioBoard) cioBoard.classList.add('active');
 
-                // Fetch snapshot now (uses cached data if recently fetched),
-                // then poll periodically so the 07:00/19:00 snapshot refreshes
-                // are picked up without a manual reload.
+                // Fetch snapshot now (uses cached data if recently fetched).
+                // MODIFIED 2026-06-10: no per-tab polling any more — the
+                // always-on 30-min poll started in init() (for the Today tab's
+                // going-home prompts) keeps this data fresh for every tab.
                 loadCheckInOutData();
-                startCheckInOutPolling();
             } else if (tab === 'van-assignment') {
                 // Show the Van Assignment board, load the roster now, then poll so
                 // edits made elsewhere (or directly in the sheet) appear over time.
@@ -2716,16 +2800,28 @@
                     if (data && data.error) throw new Error(data.error);
                     // Accept either the pre-computed snapshot or the raw boarding
                     // feed; normalizeCheckInOutData() buckets the latter client-side.
+                    // The raw payload is kept too — the Today tab's going-home
+                    // prompts read the stays from it (see buildGoingHomeIndex).
+                    cio.raw = data;
                     cio.data = normalizeCheckInOutData(data);
                     cio.lastFetched = Date.now();
                     cio.error = null;
                     renderCheckInOut(cio.data);
+                    // Going-home prompts on the Today board depend on this
+                    // data — repaint the main board now it has arrived.
+                    if (state.tab === 'today') render();
                 })
                 .catch(err => {
                     console.error('[checkinout] fetch failed:', err);
                     cio.error = err.message || String(err);
                     // If we have stale data, keep showing it; otherwise show empty + error
                     renderCheckInOut(cio.data || null);
+                    // Never succeeded yet (e.g. a failed boot fetch at TV
+                    // power-on): fast-retry like fetchData does, so the Today
+                    // board's going-home prompts aren't muted for 30 minutes.
+                    if (!cio.data) {
+                        setTimeout(() => loadCheckInOutData(true), CONFIG.RETRY_INTERVAL);
+                    }
                 })
                 .finally(() => {
                     cio.inFlight = false;
@@ -3357,6 +3453,17 @@
                 updateBehaviourCountdown();
             }
             updateModeToggleButton();
+
+            // ADDED 2026-06-10: the Today board's going-home prompts need the
+            // Boarding API stays, so fetch them on boot (concurrently with the
+            // main load) and keep them warm with an always-on 30-min poll.
+            // This replaces the CHECK-IN/OUT tab's old while-active polling
+            // (same cadence, now one owner). Cost: the live backend serves a
+            // 15-min server-side cache over Acuity, so a parked board adds at
+            // most ~2 cache-refreshing requests per hour — the cache bounds
+            // total Acuity calls regardless of how many boards poll.
+            loadCheckInOutData();
+            setInterval(() => loadCheckInOutData(true), CONFIG.CHECKINOUT_POLL_INTERVAL_MS);
 
             await fetchData();
             startAutoRefresh();
