@@ -43,6 +43,7 @@
 
             /* Van badges */
             --bv-bg: #dbeafe; --bv-text: #1d4ed8; --bv-bdr: #93c5fd;
+            --bvx-bg: #dbeafe; --bvx-text: #1d4ed8; --bvx-bdr: #93c5fd; /* BVX = BV blue (Big Van Xray) */
             --sv-bg: #d1fae5; --sv-text: #065f46; --sv-bdr: #6ee7b7;
             --dv-bg: #fef3c7; --dv-text: #92400e; --dv-bdr: #fcd34d;
             --p-bg: #f3e8ff;  --p-text: #7c3aed;  --p-bdr: #c4b5fd;
@@ -178,6 +179,7 @@
         }
 
         .van-chip.bv { background: var(--bv-bg); color: var(--bv-text); }
+        .van-chip.bvx { background: var(--bvx-bg); color: var(--bvx-text); }
         .van-chip.sv { background: var(--sv-bg); color: var(--sv-text); }
         .van-chip.dv { background: var(--dv-bg); color: var(--dv-text); }
 
@@ -540,6 +542,7 @@
         .dog-card.vg-none { /* No override — keeps default section background */ }
         .dog-card.vg-p    { background: #f3e8ff; } /* Purple tint — matches P badge palette */
         .dog-card.vg-bv   { background: #dbeafe; } /* Blue tint — matches BV badge palette */
+        .dog-card.vg-bvx  { background: #dbeafe; } /* Blue tint — matches BVX (=BV) badge palette */
         .dog-card.vg-sv   { background: #d1fae5; } /* Green tint — matches SV badge palette */
         .dog-card.vg-dv   { background: #fef3c7; } /* Amber tint — matches DV badge palette */
 
@@ -659,6 +662,7 @@
         }
 
         .badge-bv { background: var(--bv-bg); color: var(--bv-text); border-color: var(--bv-bdr); }
+        .badge-bvx { background: var(--bvx-bg); color: var(--bvx-text); border-color: var(--bvx-bdr); }
         .badge-sv { background: var(--sv-bg); color: var(--sv-text); border-color: var(--sv-bdr); }
         .badge-dv { background: var(--dv-bg); color: var(--dv-text); border-color: var(--dv-bdr); }
         .badge-p  { background: var(--p-bg);  color: var(--p-text);  border-color: var(--p-bdr);  }
@@ -1079,6 +1083,8 @@
         /* Colour the left stripe + dropdown by the selected van type (existing palette vars). */
         .van-row.van-bv { border-left-color: var(--bv-bdr); }
         .van-row.van-bv .van-select { background: var(--bv-bg); color: var(--bv-text); border-color: var(--bv-bdr); }
+        .van-row.van-bvx { border-left-color: var(--bvx-bdr); }
+        .van-row.van-bvx .van-select { background: var(--bvx-bg); color: var(--bvx-text); border-color: var(--bvx-bdr); }
         .van-row.van-sv { border-left-color: var(--sv-bdr); }
         .van-row.van-sv .van-select { background: var(--sv-bg); color: var(--sv-text); border-color: var(--sv-bdr); }
         .van-row.van-dv { border-left-color: var(--dv-bdr); }
@@ -1250,6 +1256,7 @@
 
             <div class="hdr-van-times" id="vanTimesBar">
                 <span class="van-chip bv">BV <span id="vtBV">—</span></span>
+                <span class="van-chip bvx">BVX <span id="vtBVX">—</span></span>
                 <span class="van-chip dv">DV <span id="vtDV">—</span></span>
                 <span class="van-chip sv">SV <span id="vtSV">—</span></span>
             </div>
@@ -1802,7 +1809,7 @@
         // ---- Stats ----
         function renderStats(tabData) {
             const dogs = tabData.dogs || [];
-            const vanTypes = ['V', 'BV', 'SV', 'DV'];
+            const vanTypes = ['V', 'BV', 'SV', 'DV', 'BVX'];
 
             const total = dogs.length;
             const photos = dogs.filter(d => d.photo).length;
@@ -1831,6 +1838,7 @@
         function renderVanTimes(vt) {
             if (!vt) return;
             document.getElementById('vtBV').textContent = normaliseVanTime(vt.BV);
+            document.getElementById('vtBVX').textContent = normaliseVanTime(vt.BVX);
             document.getElementById('vtDV').textContent = normaliseVanTime(vt.DV);
             document.getElementById('vtSV').textContent = normaliseVanTime(vt.SV);
         }
@@ -2578,18 +2586,20 @@
         function vpClass(vp) {
             if (vp === 'V' || vp === 'BV') return 'badge-bv';
             if (vp === 'SV') return 'badge-sv';
+            if (vp === 'BVX') return 'badge-bvx';
             if (vp === 'DV') return 'badge-dv';
             if (vp === 'P')  return 'badge-p';
             return '';
         }
 
         // ADDED: Van group index — determines sort order by PM assignment
-        // Returns: 0 = no assignment, 1 = P, 2 = V/BV, 3 = SV, 4 = DV
+        // Returns: 0 = no assignment, 1 = P, 2 = V/BV/BVX, 3 = SV, 4 = DV
+        // BVX ("Big Van Xray") behaves as a Big Van — same sort group (2) as BV.
         function getVanGroupIndex(dog) {
             const pm = (dog.vpPM || '').toUpperCase();
             if (!pm) return 0;
             if (pm === 'P')              return 1;
-            if (pm === 'V' || pm === 'BV') return 2;
+            if (pm === 'V' || pm === 'BV' || pm === 'BVX') return 2;
             if (pm === 'SV')             return 3;
             if (pm === 'DV')             return 4;
             return 0; // Unknown — treat as no assignment
@@ -2601,6 +2611,7 @@
             if (!pm) return 'vg-none';
             if (pm === 'P')              return 'vg-p';
             if (pm === 'V' || pm === 'BV') return 'vg-bv';
+            if (pm === 'BVX')            return 'vg-bvx';
             if (pm === 'SV')             return 'vg-sv';
             if (pm === 'DV')             return 'vg-dv';
             return 'vg-none';
@@ -2860,6 +2871,7 @@
         function vanRowClass(van) {
             if (van === 'BV') return 'van-bv';
             if (van === 'SV') return 'van-sv';
+            if (van === 'BVX') return 'van-bvx';
             if (van === 'DV') return 'van-dv';
             return '';
         }
@@ -2945,7 +2957,7 @@
                             '<option value=""' + (van === '' ? ' selected' : '') + '></option>' +
                             '<option value="BV"' + (van === 'BV' ? ' selected' : '') + '>BV</option>' +
                             '<option value="SV"' + (van === 'SV' ? ' selected' : '') + '>SV</option>' +
-                            '<option value="DV"' + (van === 'DV' ? ' selected' : '') + '>DV</option>' +
+                            '<option value="BVX"' + (van === 'BVX' ? ' selected' : '') + '>BVX</option>' +
                         '</select>' +
                     '</div>'
                 );
@@ -2983,7 +2995,7 @@
             const row = container.querySelector('.van-row[data-idx="' + idx + '"]');
             if (!row) return;
             const van = (dog.van || '').toUpperCase();
-            row.classList.remove('van-bv', 'van-sv', 'van-dv');
+            row.classList.remove('van-bv', 'van-sv', 'van-bvx', 'van-dv');
             const cls = vanRowClass(van);
             if (cls) row.classList.add(cls);
             const sel = row.querySelector('.van-select');
@@ -2997,7 +3009,7 @@
          * reflects the server (which didn't save), making the failure visible.
          *
          * @param {number} idx - index into state.vanAssignment.dogs
-         * @param {string} van - 'BV' | 'SV' | 'DV' | '' (unassigned)
+         * @param {string} van - 'BV' | 'SV' | 'BVX' | '' (unassigned)
          */
         function setVanType(idx, van) {
             const va = state.vanAssignment;
@@ -3026,13 +3038,13 @@
                 });
         }
 
-        /** Cycle the focused row's van type: '' → BV → SV → DV → '' (dir −1 reverses). */
+        /** Cycle the focused row's van type: '' → BV → SV → BVX → '' (dir −1 reverses). */
         function cycleFocusedVan(dir) {
             const va = state.vanAssignment;
             if (!va.rowFocused || va.focusIdx < 0) return;
             const dog = va.dogs[va.focusIdx];
             if (!dog) return;
-            const opts = ['', 'BV', 'SV', 'DV'];
+            const opts = ['', 'BV', 'SV', 'BVX'];
             let cur = opts.indexOf((dog.van || '').toUpperCase());
             if (cur === -1) cur = 0;
             const next = (cur + dir + opts.length) % opts.length;
