@@ -2586,10 +2586,25 @@
             // ADDED: XV priority pickup — Tomorrow tab only (see renderCard)
             const xvClass = (state.tab === 'tomorrow' && isXVDog(dog)) ? ' xv-priority' : '';
 
+            // ADDED (2026-07-19): Boarding School weekend-break van badge — AM
+            // badge on Monday boards (pickup back to school), PM badge on
+            // Friday boards (drop-off home for the weekend); hidden every
+            // other day. Field pairing per renderCard: vpAM↔stopAM, vpPM↔stop.
+            const bsDay = boardDayForTab();
+            let vanBadgeGrp = '';
+            if (bsDay === 1) {
+                const b = vpBadgeHTML(dog.vpAM, dog.stopAM);
+                if (b) vanBadgeGrp = `<div class="badge-grp"><span class="bg-label">AM</span>${b}</div>`;
+            } else if (bsDay === 5) {
+                const b = vpBadgeHTML(dog.vpPM, dog.stop);
+                if (b) vanBadgeGrp = `<div class="badge-grp"><span class="bg-label">PM</span>${b}</div>`;
+            }
+
             return `<div class="dog-card bs-card ${getVanGroupClass(dog)}${xvClass}${doneClass}"${focusAttrs}>` +
                 '<div class="card-main">' +
                     `<span class="card-name">${esc(dog.name)}</span>` +
                     '<div class="card-badges">' +
+                        vanBadgeGrp +
                         crateBadge +
                         behaviourBadge +
                     '</div>' +
@@ -2645,6 +2660,16 @@
         function isXVDog(dog) {
             const norm = v => String(v || '').trim().toUpperCase();
             return norm(dog.vpAM) === 'XV' || norm(dog.vpPM) === 'XV' || norm(dog.vanType) === 'XV';
+        }
+
+        // ADDED (2026-07-19): day-of-week of the DISPLAYED tab's board date —
+        // today's date, +1 day on the Tomorrow tab (same state.tab gating
+        // pattern as doneClass/xvClass). Mon=1, Fri=5. Used by the Boarding
+        // School weekend-break van badge.
+        function boardDayForTab() {
+            const d = new Date();
+            if (state.tab === 'tomorrow') d.setDate(d.getDate() + 1);
+            return d.getDay();
         }
 
         function walkBadgeHTML(walk) {
