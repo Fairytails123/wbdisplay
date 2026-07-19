@@ -546,6 +546,19 @@
         .dog-card.vg-sv   { background: #d1fae5; } /* Green tint — matches SV badge palette */
         .dog-card.vg-dv   { background: #fef3c7; } /* Amber tint — matches DV badge palette */
 
+        /* ADDED: XV priority pickup — Tomorrow tab ONLY (the class is added at
+           render time, gated on state.tab === 'tomorrow', so Today cards never
+           carry it). The whole card goes red so a next-day priority pickup can't
+           be missed at TV distance. Placed AFTER the vg-* tints so it wins the
+           equal-specificity background race when an XV dog also carries a PM van
+           tint. */
+        .dog-card.xv-priority {
+            background: #f87171;
+            border-left: 4px solid #b91c1c;
+            border-color: #b91c1c;
+        }
+        .dog-card.xv-priority .card-name { color: #450a0a; font-weight: 800; }
+
         /* ADDED: Report-done feature (Today tab only). The [data-dog-name] selector
            naturally scopes hover/focus styles to Today cards — Tomorrow cards omit
            that attribute so they keep identical visuals to before. */
@@ -2506,7 +2519,11 @@
             const doneClass = (state.tab === 'today' && isReportDone(dog.name)) ? ' report-done' : '';
             const focusAttrs = state.tab === 'today' ? ` tabindex="0" data-dog-name="${esc(dog.name)}"` : '';
 
-            return `<div class="dog-card ${cardClass} ${getVanGroupClass(dog)}${doneClass}"${focusAttrs}>` +
+            // ADDED: XV priority pickup — Tomorrow tab only, whole card red (same
+            // state.tab gating pattern as doneClass; Today keeps the usual colours).
+            const xvClass = (state.tab === 'tomorrow' && isXVDog(dog)) ? ' xv-priority' : '';
+
+            return `<div class="dog-card ${cardClass} ${getVanGroupClass(dog)}${xvClass}${doneClass}"${focusAttrs}>` +
                 '<div class="card-main">' +
                     `<span class="card-name">${esc(dog.name)}</span>` +
                     '<div class="card-badges">' +
@@ -2536,7 +2553,10 @@
             const doneClass = (state.tab === 'today' && isReportDone(dog.name)) ? ' report-done' : '';
             const focusAttrs = state.tab === 'today' ? ` tabindex="0" data-dog-name="${esc(dog.name)}"` : '';
 
-            return `<div class="dog-card gm-card ${getVanGroupClass(dog)}${doneClass}"${focusAttrs}>` +
+            // ADDED: XV priority pickup — Tomorrow tab only (see renderCard)
+            const xvClass = (state.tab === 'tomorrow' && isXVDog(dog)) ? ' xv-priority' : '';
+
+            return `<div class="dog-card gm-card ${getVanGroupClass(dog)}${xvClass}${doneClass}"${focusAttrs}>` +
                 '<div class="card-main">' +
                     `<span class="card-name">${esc(dog.name)}</span>` +
                     '<div class="card-badges">' +
@@ -2563,7 +2583,10 @@
             const doneClass = (state.tab === 'today' && isReportDone(dog.name)) ? ' report-done' : '';
             const focusAttrs = state.tab === 'today' ? ` tabindex="0" data-dog-name="${esc(dog.name)}"` : '';
 
-            return `<div class="dog-card bs-card ${getVanGroupClass(dog)}${doneClass}"${focusAttrs}>` +
+            // ADDED: XV priority pickup — Tomorrow tab only (see renderCard)
+            const xvClass = (state.tab === 'tomorrow' && isXVDog(dog)) ? ' xv-priority' : '';
+
+            return `<div class="dog-card bs-card ${getVanGroupClass(dog)}${xvClass}${doneClass}"${focusAttrs}>` +
                 '<div class="card-main">' +
                     `<span class="card-name">${esc(dog.name)}</span>` +
                     '<div class="card-badges">' +
@@ -2615,6 +2638,13 @@
             if (pm === 'SV')             return 'vg-sv';
             if (pm === 'DV')             return 'vg-dv';
             return 'vg-none';
+        }
+
+        // ADDED: XV priority pickup detector — true when any van field carries the
+        // 'XV' (priority pickup) marker. Used by the Tomorrow-tab red cards only.
+        function isXVDog(dog) {
+            const norm = v => String(v || '').trim().toUpperCase();
+            return norm(dog.vpAM) === 'XV' || norm(dog.vpPM) === 'XV' || norm(dog.vanType) === 'XV';
         }
 
         function walkBadgeHTML(walk) {
